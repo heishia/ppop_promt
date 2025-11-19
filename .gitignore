@@ -8,12 +8,29 @@ env/
 venv/
 .venv/
 ENV/
+*.pyc
+*.pyo
+*.pyd
 
 # PyInstaller
 build/
 dist/
 *.spec
 *.manifest
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
 
 # IDEs
 .vscode/
@@ -27,8 +44,38 @@ dist/
 Thumbs.db
 desktop.ini
 
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Electron
+out/
+dist-electron/
+*.app
+*.dmg
+*.exe
+*.deb
+*.rpm
+*.snap
+
+# Build outputs
+frontend/build/
+frontend/dist/
+frontend/.vite/
+
 # Project specific
 *.exe
 *.dll
 *.dylib
+
+# Backup files
+*.bak
+*.backup
+*~
 
