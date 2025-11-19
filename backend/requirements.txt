@@ -6,4 +6,5 @@ uvicorn[standard]==0.32.0
 sqlalchemy==2.0.36
 pydantic==2.9.2
 pydantic-settings==2.5.2
-requests==2.32.3 
+requests==2.32.3
+pyinstaller==6.3.0 

@@ -3,12 +3,13 @@
 
 폴더의 생성, 조회, 수정, 삭제를 처리합니다.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 from backend.db import get_db
 from backend.models import Folder, Prompt
 from backend.schemas import FolderCreate, FolderUpdate, FolderResponse
+from backend.exceptions import FolderNotFoundError, FolderNameDuplicateError
 
 router = APIRouter(prefix="/api/folders", tags=["folders"])
 
@@ -43,7 +44,7 @@ def get_folder(folder_id: int, db: Session = Depends(get_db)):
     """
     folder = db.query(Folder).filter(Folder.id == folder_id).first()
     if not folder:
-        raise HTTPException(status_code=404, detail="폴더를 찾을 수 없습니다")
+        raise FolderNotFoundError(folder_id)
     return folder
 
 @router.post("/", response_model=FolderResponse, status_code=201)
@@ -64,7 +65,7 @@ def create_folder(folder_data: FolderCreate, db: Session = Depends(get_db)):
     # 중복 이름 체크
     existing = db.query(Folder).filter(Folder.name == folder_data.name).first()
     if existing:
-        raise HTTPException(status_code=400, detail="이미 존재하는 폴더 이름입니다")
+        raise FolderNameDuplicateError(folder_data.name)
     
     folder = Folder(name=folder_data.name)
     db.add(folder)
@@ -94,7 +95,7 @@ def update_folder(
     """
     folder = db.query(Folder).filter(Folder.id == folder_id).first()
     if not folder:
-        raise HTTPException(status_code=404, detail="폴더를 찾을 수 없습니다")
+        raise FolderNotFoundError(folder_id)
     
     if folder_data.name is not None:
         # 중복 이름 체크 (자기 자신 제외)
@@ -103,7 +104,7 @@ def update_folder(
             Folder.id != folder_id
         ).first()
         if existing:
-            raise HTTPException(status_code=400, detail="이미 존재하는 폴더 이름입니다")
+            raise FolderNameDuplicateError(folder_data.name)
         
         folder.name = folder_data.name
     
@@ -128,7 +129,7 @@ def delete_folder(folder_id: int, db: Session = Depends(get_db)):
     """
     folder = db.query(Folder).filter(Folder.id == folder_id).first()
     if not folder:
-        raise HTTPException(status_code=404, detail="폴더를 찾을 수 없습니다")
+        raise FolderNotFoundError(folder_id)
     
     db.delete(folder)
     db.commit()

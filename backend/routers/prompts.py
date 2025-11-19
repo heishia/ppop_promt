@@ -3,12 +3,17 @@
 
 프롬프트의 생성, 조회, 수정, 삭제를 처리합니다.
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from backend.db import get_db
 from backend.models import Prompt, Folder, AutoText
 from backend.schemas import PromptCreate, PromptUpdate, PromptResponse, AutoTextCreate
+from backend.exceptions import (
+    PromptNotFoundError,
+    FolderNotFoundError,
+    AutoTextDuplicateError
+)
 
 router = APIRouter(prefix="/api/prompts", tags=["prompts"])
 
@@ -57,7 +62,7 @@ def get_prompt(prompt_id: int, db: Session = Depends(get_db)):
     """
     prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
     if not prompt:
-        raise HTTPException(status_code=404, detail="프롬프트를 찾을 수 없습니다")
+        raise PromptNotFoundError(prompt_id)
     return prompt
 
 @router.post("/", response_model=PromptResponse, status_code=201)
@@ -79,7 +84,7 @@ def create_prompt(prompt_data: PromptCreate, db: Session = Depends(get_db)):
     if prompt_data.folder_id:
         folder = db.query(Folder).filter(Folder.id == prompt_data.folder_id).first()
         if not folder:
-            raise HTTPException(status_code=404, detail="폴더를 찾을 수 없습니다")
+            raise FolderNotFoundError(prompt_data.folder_id)
     
     # 프롬프트 생성
     prompt = Prompt(
@@ -99,10 +104,7 @@ def create_prompt(prompt_data: PromptCreate, db: Session = Depends(get_db)):
             AutoText.trigger_text == autotext_data.trigger_text
         ).first()
         if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"이미 사용 중인 자동변환 텍스트입니다: {autotext_data.trigger_text}"
-            )
+            raise AutoTextDuplicateError(autotext_data.trigger_text)
         
         autotext = AutoText(
             prompt_id=prompt.id,
@@ -136,14 +138,14 @@ def update_prompt(
     """
     prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
     if not prompt:
-        raise HTTPException(status_code=404, detail="프롬프트를 찾을 수 없습니다")
+        raise PromptNotFoundError(prompt_id)
     
     # 폴더 ID 업데이트 시 존재 여부 확인
     if prompt_data.folder_id is not None:
         if prompt_data.folder_id != 0:  # 0은 폴더 없음을 의미
             folder = db.query(Folder).filter(Folder.id == prompt_data.folder_id).first()
             if not folder:
-                raise HTTPException(status_code=404, detail="폴더를 찾을 수 없습니다")
+                raise FolderNotFoundError(prompt_data.folder_id)
             prompt.folder_id = prompt_data.folder_id
         else:
             prompt.folder_id = None
@@ -168,10 +170,7 @@ def update_prompt(
                 AutoText.trigger_text == autotext_data.trigger_text
             ).first()
             if existing:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"이미 사용 중인 자동변환 텍스트입니다: {autotext_data.trigger_text}"
-                )
+                raise AutoTextDuplicateError(autotext_data.trigger_text)
             
             autotext = AutoText(
                 prompt_id=prompt.id,
@@ -197,7 +196,7 @@ def delete_prompt(prompt_id: int, db: Session = Depends(get_db)):
     """
     prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
     if not prompt:
-        raise HTTPException(status_code=404, detail="프롬프트를 찾을 수 없습니다")
+        raise PromptNotFoundError(prompt_id)
     
     db.delete(prompt)
     db.commit()

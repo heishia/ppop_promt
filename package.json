@@ -1,0 +1,51 @@
+{
+  "name": "ppop_promt",
+  "productName": "ppop_promt",
+  "version": "1.0.0",
+  "description": "Blueme 프롬프트 관리 데스크탑 애플리케이션",
+  "main": "electron.js",
+  "author": "ppop_promt",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron .",
+    "build:backend": "python build_backend.py",
+    "build:frontend": "cd frontend && npm run build",
+    "build:electron": "electron-builder",
+    "build": "npm run build:backend && npm run build:frontend && npm run build:electron"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.ppop_promt.app",
+    "productName": "ppop_promt",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron.js",
+      "frontend/dist/**/*",
+      "public/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/ppop_promt_backend.exe",
+        "to": "ppop_promt_backend.exe"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
+
