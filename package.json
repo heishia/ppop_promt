@@ -42,7 +42,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "public/icon.ico"
+      "icon": "public/logo2.ico"
     },
     "nsis": {
       "oneClick": false,

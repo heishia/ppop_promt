@@ -83,7 +83,7 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
-        icon: path.join(__dirname, 'public', 'icon.ico'),
+        icon: path.join(__dirname, 'public', 'logo2.ico'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
