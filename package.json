@@ -11,7 +11,7 @@
     "clean": "node clean.js",
     "build:backend": "python backend/build_backend.py",
     "build:frontend": "cd frontend && npm run build",
-    "build:electron": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=onTag",
+    "build:electron": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=always",
     "build": "npm run clean && npm run build:backend && npm run build:frontend && npm run build:electron"
   },
   "devDependencies": {

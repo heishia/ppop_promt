@@ -32,7 +32,12 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'pysqlite2',      # SQLite 대체 구현 (사용 안 함)
+        'MySQLdb',        # MySQL 드라이버 (사용 안 함)
+        'psycopg2',       # PostgreSQL 드라이버 (사용 안 함)
+        'tzdata',         # 타임존 데이터 (SQLite 기본 포함)
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

@@ -8,28 +8,37 @@ Blueme는 프롬프트를 저장하고 자동변환 텍스트 기능을 제공�
 2. **자동변환 텍스트** - 특정 텍스트 입력 시 자동으로 프롬프트로 변환 (예: `@front` 입력 시 자동 변환)
 3. **FastAPI 백엔드** - RESTful API를 통한 데이터 관리
 4. **SQLite 데이터베이스** - 로컬 데이터베이스로 안전하게 데이터 저장
+5. **자동 업데이트** - GitHub Release를 통한 자동 업데이트 지원
 
 ## 프로젝트 구조
 
 ```
-blueme/
+ppop_promt/
 ├── backend/              # FastAPI 백엔드 서버
 │   ├── main.py          # FastAPI 앱 진입점
 │   ├── db.py            # 데이터베이스 연결 및 초기화
 │   ├── models.py        # SQLAlchemy 모델
 │   ├── schemas.py       # Pydantic 스키마
 │   ├── migrate.py       # 데이터 마이그레이션 스크립트
+│   ├── build.spec       # PyInstaller 빌드 설정
+│   ├── build_backend.py # 백엔드 빌드 스크립트
 │   ├── routers/         # API 라우터
 │   │   ├── prompts.py   # 프롬프트 CRUD API
 │   │   ├── folders.py   # 폴더 CRUD API
 │   │   └── autotext.py  # 자동변환 텍스트 API
 │   └── services/        # 백엔드 서비스
 │       └── autotext_watcher.py  # 자동변환 텍스트 감지 서비스
-├── frontend/            # React + Electron 프론트엔드
+├── frontend/            # React + Vite 프론트엔드
 │   ├── src/             # React 소스 코드
-│   ├── electron/        # Electron 메인 프로세스 (예정)
+│   │   ├── components/  # React 컴포넌트
+│   │   └── hooks/       # React 훅 (useAutoUpdater 등)
 │   └── package.json     # 프론트엔드 의존성
-├── requirements.txt     # Python 의존성
+├── electron.js          # Electron 메인 프로세스
+├── preload.js           # Electron preload 스크립트
+├── clean.js             # 빌드 결과물 정리 스크립트
+├── package.json         # Electron 빌드 설정
+├── .env                 # 환경 변수 (GitHub Token 등)
+├── .env.example         # 환경 변수 템플릿
 └── README.md           # 프로젝트 문서
 ```
 
@@ -125,7 +134,117 @@ npm install
 npm run dev
 ```
 
-프론트엔드가 실행되면 브라우저에서 http://localhost:3000 (또는 Vite 기본 포트)로 접속할 수 있습니다.
+프론트엔드가 실행되면 브라우저에서 http://localhost:5173 (Vite 기본 포트)로 접속할 수 있습니다.
+
+### 6단계: Electron 앱 실행
+
+```bash
+# 프로젝트 루트에서
+npm install
+
+# Electron 개발 모드 실행
+npm run dev
+```
+
+## 프로덕션 빌드 및 배포
+
+### 빌드 전 준비사항
+
+1. **GitHub Token 설정**
+   
+   `.env` 파일을 생성하고 GitHub Personal Access Token을 설정하세요:
+   
+   ```env
+   GH_TOKEN=your_github_token_here
+   ```
+   
+   GitHub Token 생성 방법:
+   - GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+   - `repo` 권한 체크 후 생성
+   - `.env.example` 파일을 참고하세요
+
+2. **버전 업데이트**
+   
+   `package.json`의 `version` 필드를 업데이트하세요:
+   ```json
+   "version": "1.0.1"
+   ```
+
+### 빌드 명령어
+
+```bash
+# 전체 빌드 (백엔드 + 프론트엔드 + Electron)
+npm run build
+```
+
+이 명령어는 다음을 순차적으로 실행합니다:
+1. **기존 빌드 결과물 삭제** (`clean`)
+2. **백엔드 빌드** → `resources/ppop_promt_backend.exe`
+3. **프론트엔드 빌드** → `frontend/dist/`
+4. **Electron 빌드 및 GitHub Release 업로드** → `dist/`
+
+### 개별 빌드 명령어
+
+```bash
+# 기존 빌드 결과물만 삭제
+npm run clean
+
+# 백엔드만 빌드
+npm run build:backend
+
+# 프론트엔드만 빌드
+npm run build:frontend
+
+# Electron만 빌드 (GitHub Release 업로드 포함)
+npm run build:electron
+```
+
+### GitHub Release 배포
+
+빌드는 `--publish=always` 옵션으로 설정되어 있어, 빌드할 때마다 자동으로 새 GitHub Release를 생성합니다.
+
+**배포 절차:**
+
+```bash
+# 1. 버전 업데이트 (package.json의 version 수정)
+# 예: "version": "1.0.1"
+
+# 2. 빌드 및 자동 업로드
+npm run build
+```
+
+빌드가 완료되면 자동으로 새 GitHub Release가 생성되고 업로드됩니다:
+- `https://github.com/heishia/ppop_promt/releases`
+
+**참고**: 
+- `package.json`의 `version`이 Release 버전으로 사용됩니다
+- 같은 버전으로 다시 빌드하면 기존 Release를 덮어씁니다
+- 새 버전으로 빌드하면 새 Release가 생성됩니다
+
+### 빌드 결과물
+
+- `dist/ppop_promt Setup 1.0.0.exe` - Windows 설치 파일 (최종 배포용)
+- `dist/latest.yml` - 자동 업데이트 메타데이터
+- `resources/ppop_promt_backend.exe` - 백엔드 독립 실행 파일
+- `frontend/dist/` - 프론트엔드 정적 파일
+
+## 자동 업데이트
+
+앱은 GitHub Release를 통해 자동 업데이트를 지원합니다.
+
+### 사용자 측
+
+- 앱 시작 시 자동으로 업데이트 확인
+- 새 버전 발견 시 사용자에게 알림
+- 사용자가 선택하여 다운로드 및 설치 가능
+- InfoPage에서 수동으로 업데이트 확인 가능
+
+### 개발자 측
+
+1. `package.json`에서 버전 업데이트
+2. Git 태그 생성 및 푸시
+3. `npm run build` 실행
+4. 자동으로 GitHub Release에 업로드됨
 
 ## 개발 가이드
 
@@ -155,13 +274,14 @@ SQLite 데이터베이스는 다음 위치에 저장됩니다:
 
 ### 환경 변수
 
-필요한 경우 `.env` 파일을 생성하여 설정할 수 있습니다:
+`.env` 파일을 생성하여 설정할 수 있습니다:
 
 ```env
-DATABASE_URL=sqlite:///./blueme.db
-API_HOST=127.0.0.1
-API_PORT=8000
+# GitHub Personal Access Token (빌드 및 배포용)
+GH_TOKEN=your_github_token_here
 ```
+
+`.env.example` 파일을 참고하여 `.env` 파일을 생성하세요.
 
 ## 문제 해결
 
@@ -206,13 +326,10 @@ API_PORT=8000
 
 ## 업데이트 내역
 
-### v2.0.0 (현재)
-- FastAPI 백엔드로 마이그레이션
+### v1.0.0 (현재)
+- Electron 데스크탑 앱 구조
+- FastAPI 백엔드 서버
 - SQLite 데이터베이스 사용
-- Electron 데스크탑 앱 구조로 전환
-- 자동변환 텍스트 서비스 분리
-
-### v1.0.0
-- PyQt6 기반 데스크탑 앱
-- JSON 파일 기반 데이터 저장
-- 키보드 단축키 기능
+- 자동변환 텍스트 서비스
+- GitHub Release 자동 업데이트 지원
+- PyInstaller를 통한 백엔드 독립 실행 파일 빌드
