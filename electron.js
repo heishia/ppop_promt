@@ -5,6 +5,7 @@
  */
 const { app, BrowserWindow, screen, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 
@@ -102,7 +103,52 @@ function createWindow() {
         mainWindow.webContents.openDevTools();  // 개발자 도구 열기
     } else {
         // 프로덕션 환경: 빌드된 파일
-        mainWindow.loadFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
+        const indexPath = path.join(__dirname, 'frontend', 'dist', 'index.html');
+        
+        // 파일 존재 여부 확인
+        if (!fs.existsSync(indexPath)) {
+            const errorMsg = `프론트엔드 파일을 찾을 수 없습니다.\n경로: ${indexPath}\n\n앱을 다시 빌드해주세요.`;
+            console.error(errorMsg);
+            dialog.showErrorBox('파일 로드 오류', errorMsg);
+            return;
+        }
+        
+        console.log(`프론트엔드 파일 로드 시도: ${indexPath}`);
+        
+        // 파일 로드 및 에러 핸들링
+        mainWindow.loadFile(indexPath).catch((error) => {
+            const errorMsg = `프론트엔드를 로드하는 중 오류가 발생했습니다:\n${error.message}\n\n경로: ${indexPath}`;
+            console.error(errorMsg, error);
+            dialog.showErrorBox('로드 오류', errorMsg);
+        });
+        
+        // 프로덕션 환경에서도 개발자 도구 열기 지원
+        // 1. 환경 변수로 활성화 (DEBUG=true)
+        if (process.env.DEBUG === 'true') {
+            mainWindow.webContents.openDevTools();
+            console.log('디버그 모드: 개발자 도구가 자동으로 열렸습니다.');
+        }
+        
+        // 2. 키보드 단축키로 열기 (Ctrl+Shift+I)
+        mainWindow.webContents.on('before-input-event', (event, input) => {
+            if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+                mainWindow.webContents.openDevTools();
+            }
+        });
+        
+        // 페이지 로드 완료 시 에러 확인
+        mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+            const errorMsg = `페이지 로드 실패:\n코드: ${errorCode}\n설명: ${errorDescription}\nURL: ${validatedURL}`;
+            console.error(errorMsg);
+            dialog.showErrorBox('페이지 로드 오류', errorMsg);
+        });
+        
+        // 콘솔 에러 표시
+        mainWindow.webContents.on('console-message', (event, level, message) => {
+            if (level >= 2) { // warning 이상
+                console.log(`[Renderer ${level}] ${message}`);
+            }
+        });
     }
     
     mainWindow.on('closed', () => {

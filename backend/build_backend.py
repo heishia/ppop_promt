@@ -1,7 +1,7 @@
 """
-백엔드 빌드 스크립트
+Backend Build Script
 
-PyInstaller를 사용하여 백엔드를 독립 실행 파일로 빌드합니다.
+Builds backend as standalone executable using PyInstaller.
 """
 import os
 import sys
@@ -10,60 +10,60 @@ import subprocess
 from pathlib import Path
 
 def build_backend():
-    """백엔드를 PyInstaller로 빌드"""
-    print("🔨 백엔드 빌드를 시작합니다...")
+    """Build backend using PyInstaller"""
+    print("[BUILD] Starting backend build...")
     
-    # 현재 스크립트 위치 (backend 디렉토리)
+    # Current script location (backend directory)
     backend_dir = Path(__file__).parent
-    # 프로젝트 루트
+    # Project root
     root_dir = backend_dir.parent
     spec_file = backend_dir / "build.spec"
     
-    # run.py를 backend 디렉토리로 임시 복사
+    # Temporarily copy run.py to backend directory
     run_py_src = root_dir / "run.py"
     run_py_dest = backend_dir / "run.py"
     
     if not run_py_src.exists():
-        print(f"❌ run.py를 찾을 수 없습니다: {run_py_src}")
+        print(f"[ERROR] run.py not found: {run_py_src}")
         return False
     
-    print(f"📋 run.py를 복사합니다: {run_py_src} -> {run_py_dest}")
+    print(f"[INFO] Copying run.py: {run_py_src} -> {run_py_dest}")
     shutil.copy2(run_py_src, run_py_dest)
     
     try:
-        # PyInstaller 실행
-        print(f"🔧 PyInstaller를 실행합니다: {spec_file}")
+        # Run PyInstaller
+        print(f"[INFO] Running PyInstaller: {spec_file}")
         result = subprocess.run(
             [sys.executable, "-m", "PyInstaller", str(spec_file), "--clean"],
             cwd=str(backend_dir),
             check=True
         )
         
-        # 빌드된 파일 위치
+        # Built file location
         exe_path = backend_dir / "dist" / "ppop_promt_backend.exe"
         
         if exe_path.exists():
-            print(f"✅ 백엔드 빌드 완료: {exe_path}")
+            print(f"[SUCCESS] Backend build completed: {exe_path}")
             
-            # electron-builder가 찾을 수 있도록 루트의 resources 디렉토리로 복사
+            # Copy to resources directory for electron-builder
             resources_dir = root_dir / "resources"
             resources_dir.mkdir(exist_ok=True)
             
             dest_exe = resources_dir / "ppop_promt_backend.exe"
             shutil.copy2(exe_path, dest_exe)
-            print(f"📦 실행 파일 복사 완료: {dest_exe}")
+            print(f"[INFO] Executable copied: {dest_exe}")
         else:
-            print("❌ 빌드된 실행 파일을 찾을 수 없습니다.")
+            print("[ERROR] Built executable not found.")
             return False
             
     except subprocess.CalledProcessError as e:
-        print(f"❌ 빌드 실패: {e}")
+        print(f"[ERROR] Build failed: {e}")
         return False
     finally:
-        # 임시로 복사한 run.py 삭제
+        # Clean up temporarily copied run.py
         if run_py_dest.exists():
             run_py_dest.unlink()
-            print("🧹 임시 파일 정리 완료")
+            print("[INFO] Temporary files cleaned up")
     
     return True
 

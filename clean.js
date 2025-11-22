@@ -29,44 +29,44 @@ const getElectronBuilderCachePath = () => {
 };
 
 const run = async () => {
-  console.log('🧹 빌드 결과물 정리 중...\n');
+  console.log('[CLEAN] Cleaning build artifacts...\n');
   
-  // 일반 빌드 결과물 정리
+  // Clean general build artifacts
   for (const p of paths) {
     try {
       await rm(p, { recursive: true, force: true });
-      console.log(`✅ 삭제 완료: ${p}`);
+      console.log(`[OK] Deleted: ${p}`);
     } catch (e) {
-      // 폴더가 없어도 에러가 나지 않도록 force: true 사용
-      console.log(`⏭️  건너뜀: ${p} (존재하지 않음)`);
+      // Use force: true to avoid errors if folder doesn't exist
+      console.log(`[SKIP] ${p} (not found)`);
     }
   }
   
-  // electron-builder 캐시 정리
+  // Clean electron-builder cache
   const cachePath = getElectronBuilderCachePath();
   try {
     await rm(cachePath, { recursive: true, force: true });
-    console.log(`✅ 삭제 완료: electron-builder 캐시 (${cachePath})`);
+    console.log(`[OK] Deleted: electron-builder cache (${cachePath})`);
   } catch (e) {
-    console.log(`⏭️  건너뜀: electron-builder 캐시 (존재하지 않음)`);
+    console.log(`[SKIP] electron-builder cache (not found)`);
   }
   
-  // winCodeSign 캐시 정리 (Windows만)
+  // Clean winCodeSign cache (Windows only)
   if (process.platform === 'win32') {
     const winCodeSignCachePath = path.join(os.homedir(), 'AppData', 'Local', 'electron-builder', 'Cache', 'winCodeSign');
     try {
       await rm(winCodeSignCachePath, { recursive: true, force: true });
-      console.log(`✅ 삭제 완료: winCodeSign 캐시 (${winCodeSignCachePath})`);
+      console.log(`[OK] Deleted: winCodeSign cache (${winCodeSignCachePath})`);
     } catch (e) {
-      console.log(`⏭️  건너뜀: winCodeSign 캐시 (존재하지 않음)`);
+      console.log(`[SKIP] winCodeSign cache (not found)`);
     }
   }
   
-  console.log('\n✨ 정리 완료!');
+  console.log('\n[CLEAN] Cleanup completed!');
 };
 
 run().catch((error) => {
-  console.error('❌ 정리 중 오류 발생:', error);
+  console.error('[ERROR] Cleanup failed:', error);
   process.exit(1);
 });
 

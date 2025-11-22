@@ -1,8 +1,11 @@
 # Self-signed code signing certificate creation script
 # Requires administrator privileges
 
+# UTF-8 인코딩 설정
+chcp 65001 | Out-Null
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
+$PSDefaultParameterValues['*:Encoding'] = 'utf8'
 
 Write-Host "Creating self-signed code signing certificate..." -ForegroundColor Cyan
 

@@ -123,173 +123,175 @@ export function InfoPage({ onBack }: InfoPageProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-0">
-        {/* 로고 */}
-        <div className="flex justify-center" style={{ paddingTop: '4rem', paddingBottom: '1rem', marginBottom: '2rem' }}>
-          <img
-            src="/logo.png"
-            alt="PPOP Prompt Logo"
-            className="object-contain rounded-lg"
-            style={{ width: '48px', height: '48px' }}
-          />
-        </div>
-
-        {/* 피드백 보내기 */}
-        <div className="text-center" style={{ marginBottom: '3rem' }}>
-          <div className="flex justify-center" style={{ marginBottom: '1rem' }}>
-            <Button
-              type="button"
-              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleFeedbackClick();
-              }}
-              variant="outline"
-              className="w-auto cursor-pointer"
-              style={{ pointerEvents: 'auto', zIndex: 10 }}
-            >
-              <Mail className="w-4 h-4 mr-2" />
-              피드백 보내기
-            </Button>
+      <div className="flex-1 overflow-auto px-6 py-4 flex items-center justify-center">
+        <div className="w-full max-w-2xl space-y-6 flex flex-col items-center">
+          {/* 로고 */}
+          <div className="flex justify-center pt-4 pb-2">
+            <img
+              src="/logo.png"
+              alt="PPOP Prompt Logo"
+              className="object-contain rounded-lg"
+              style={{ width: '48px', height: '48px' }}
+            />
           </div>
-          <p className="text-sm text-muted-foreground text-center mx-auto" style={{ textAlign: 'center' }}>
-            PPOP Prompt를 사용하시면서 개선이 필요한 부분이나<br />
-            새로운 기능에 대한 아이디어가 있으시다면 언제든지 알려주세요.
-          </p>
-        </div>
 
-        {/* 버그 제보 */}
-        <div className="text-center" style={{ marginBottom: '3rem' }}>
-          <div className="flex justify-center" style={{ marginBottom: '1rem' }}>
-            <Button
-              type="button"
-              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleBugReportClick();
-              }}
-              variant="outline"
-              className="w-auto cursor-pointer"
-              style={{ pointerEvents: 'auto', zIndex: 10 }}
-            >
-              <Bug className="w-4 h-4 mr-2 text-destructive" />
-              버그 제보
-            </Button>
+          {/* 피드백 보내기 */}
+          <div className="text-center space-y-2 w-full flex flex-col items-center">
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleFeedbackClick();
+                }}
+                variant="outline"
+                className="w-auto cursor-pointer"
+                style={{ pointerEvents: 'auto', zIndex: 10 }}
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                피드백 보내기
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto" style={{ textAlign: 'center' }}>
+              PPOP Prompt를 사용하시면서 개선이 필요한 부분이나<br />
+              새로운 기능에 대한 아이디어가 있으시다면 언제든지 알려주세요.
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground text-center mx-auto" style={{ textAlign: 'center' }}>
-            앱 사용 중 발생한 오류나 예상치 못한 동작을 발견하셨다면<br />
-            자세한 내용과 함께 제보해 주시면 빠르게 수정하겠습니다.
-          </p>
-        </div>
 
-        {/* 개발자 정보 */}
-        <div className="text-center" style={{ marginBottom: '0rem' }}>
-          <div className="flex justify-center" style={{ marginBottom: '1rem' }}>
-            <Button
-              onClick={() => {
-                // 향후 실제 URL로 교체 예정
-                // window.open('https://sharevibe.com', '_blank');
-              }}
-              variant="default"
-              className="w-auto"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              쉐어바이브에서 더 알아보기
-            </Button>
+          {/* 버그 제보 */}
+          <div className="text-center space-y-2 w-full flex flex-col items-center">
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleBugReportClick();
+                }}
+                variant="outline"
+                className="w-auto cursor-pointer"
+                style={{ pointerEvents: 'auto', zIndex: 10 }}
+              >
+                <Bug className="w-4 h-4 mr-2 text-destructive" />
+                버그 제보
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto" style={{ textAlign: 'center' }}>
+              앱 사용 중 발생한 오류나 예상치 못한 동작을 발견하셨다면<br />
+              자세한 내용과 함께 제보해 주시면 빠르게 수정하겠습니다.
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground text-center mx-auto" style={{ textAlign: 'center', marginBottom: '0rem' }}>
-            <strong className="text-foreground">김뽑희</strong>는 사용자 경험을 최우선으로 생각하며<br />
-            다양한 무료 애플리케이션을 개발하고 배포하고 있습니다.
-          </p>
+
+          {/* 개발자 정보 */}
+          <div className="text-center space-y-2 pb-4 w-full flex flex-col items-center">
+            <div className="flex justify-center">
+              <Button
+                onClick={() => {
+                  // 향후 실제 URL로 교체 예정
+                  // window.open('https://sharevibe.com', '_blank');
+                }}
+                variant="default"
+                className="w-auto"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                쉐어바이브에서 더 알아보기
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto" style={{ textAlign: 'center' }}>
+              <strong className="text-foreground">김뽑희</strong>는 사용자 경험을 최우선으로 생각하며<br />
+              다양한 무료 애플리케이션을 개발하고 배포하고 있습니다.
+            </p>
+          </div>
+
+          {/* 업데이트 체크 섹션 */}
+          {window.electronAPI && (
+            <div className="text-center pt-2 pb-4 w-full flex flex-col items-center">
+              <div className="flex flex-col items-center gap-3">
+                {status.checking && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    업데이트 확인 중...
+                  </div>
+                )}
+                
+                {status.available && !status.downloading && !status.downloaded && (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-center gap-2 text-sm text-foreground">
+                      <AlertCircle className="w-4 h-4 text-primary" />
+                      새 버전 {status.version}이(가) 사용 가능합니다.
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        await downloadUpdate();
+                        toast.success('업데이트 다운로드를 시작했습니다.');
+                      }}
+                      variant="default"
+                      size="sm"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      업데이트 다운로드
+                    </Button>
+                  </div>
+                )}
+                
+                {status.downloading && (
+                  <div className="flex flex-col items-center gap-2 w-full max-w-xs">
+                    <div className="flex items-center gap-2 text-sm text-foreground">
+                      <Download className="w-4 h-4 animate-bounce" />
+                      다운로드 중... {status.progress}%
+                    </div>
+                    <Progress value={status.progress} className="w-full" />
+                  </div>
+                )}
+                
+                {status.downloaded && (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-center gap-2 text-sm text-foreground">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      업데이트 다운로드 완료
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        await installUpdate();
+                        toast.success('앱을 재시작하여 업데이트를 설치합니다.');
+                      }}
+                      variant="default"
+                      size="sm"
+                    >
+                      지금 재시작
+                    </Button>
+                  </div>
+                )}
+                
+                {status.error && (
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <AlertCircle className="w-4 h-4" />
+                    {status.error}
+                  </div>
+                )}
+                
+                {!status.checking && !status.available && !status.downloading && !status.downloaded && !status.error && (
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-sm text-muted-foreground">최신 버전을 사용 중입니다.</p>
+                    <Button
+                      onClick={checkForUpdates}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      업데이트 확인
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 업데이트 체크 섹션 */}
-      {window.electronAPI && (
-        <div className="text-center" style={{ marginBottom: '2rem', padding: '0 2rem' }}>
-          <div className="flex flex-col items-center gap-3">
-            {status.checking && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                업데이트 확인 중...
-              </div>
-            )}
-            
-            {status.available && !status.downloading && !status.downloaded && (
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-2 text-sm text-foreground">
-                  <AlertCircle className="w-4 h-4 text-primary" />
-                  새 버전 {status.version}이(가) 사용 가능합니다.
-                </div>
-                <Button
-                  onClick={async () => {
-                    await downloadUpdate();
-                    toast.success('업데이트 다운로드를 시작했습니다.');
-                  }}
-                  variant="default"
-                  size="sm"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  업데이트 다운로드
-                </Button>
-              </div>
-            )}
-            
-            {status.downloading && (
-              <div className="flex flex-col items-center gap-2 w-full max-w-xs">
-                <div className="flex items-center gap-2 text-sm text-foreground">
-                  <Download className="w-4 h-4 animate-bounce" />
-                  다운로드 중... {status.progress}%
-                </div>
-                <Progress value={status.progress} className="w-full" />
-              </div>
-            )}
-            
-            {status.downloaded && (
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-2 text-sm text-foreground">
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  업데이트 다운로드 완료
-                </div>
-                <Button
-                  onClick={async () => {
-                    await installUpdate();
-                    toast.success('앱을 재시작하여 업데이트를 설치합니다.');
-                  }}
-                  variant="default"
-                  size="sm"
-                >
-                  지금 재시작
-                </Button>
-              </div>
-            )}
-            
-            {status.error && (
-              <div className="flex items-center gap-2 text-sm text-destructive">
-                <AlertCircle className="w-4 h-4" />
-                {status.error}
-              </div>
-            )}
-            
-            {!status.checking && !status.available && !status.downloading && !status.downloaded && !status.error && (
-              <div className="flex flex-col items-center gap-2">
-                <p className="text-sm text-muted-foreground">최신 버전을 사용 중입니다.</p>
-                <Button
-                  onClick={checkForUpdates}
-                  variant="outline"
-                  size="sm"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  업데이트 확인
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* 푸터 - 라이센스 정보 */}
-      <div className="border-t border-border px-6 py-4 mt-auto">
+      <div className="border-t border-border px-6 py-3 mt-auto">
         <div className="text-center space-y-1">
           <p className="text-xs text-muted-foreground">
             <strong className="text-foreground">PPOP Prompt</strong> © 2025 김뽑희. All rights reserved.

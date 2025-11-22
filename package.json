@@ -13,6 +13,7 @@
     "build:frontend": "cd frontend && npm run build",
     "build:electron": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=always",
     "build:electron:clean": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=never --config.cache=null",
+    "build:electron:unsigned": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=always --config.win.sign=null",
     "build": "npm run clean && npm run build:backend && npm run build:frontend && npm run build:electron"
   },
   "dependencies": {
@@ -67,7 +68,7 @@
       ],
       "icon": "public/logo.ico",
       "certificateFile": "certificate.pfx",
-      "certificatePassword": "${CSC_KEY_PASSWORD}"
+      "publisherName": "ppop_promt"
     },
     "nsis": {
       "oneClick": false,
