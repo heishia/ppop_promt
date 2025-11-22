@@ -4,6 +4,13 @@ import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
 import { Save } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 interface AutoText {
   shortcut: string;
@@ -18,19 +25,27 @@ interface PromptData {
   folderId?: string;
 }
 
+interface FolderType {
+  id: string;
+  name: string;
+}
+
 interface PromptEditorProps {
   promptId?: string;
   promptData?: PromptData;
+  folders: FolderType[];
   onSave: (data: {
     name: string;
     prompt: string;
     autoTexts: AutoText[];
+    folderId?: string;
   }) => void;
 }
 
-export function PromptEditor({ promptId, promptData, onSave }: PromptEditorProps) {
+export function PromptEditor({ promptData, folders, onSave }: PromptEditorProps) {
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [folderId, setFolderId] = useState<string>("none");
   const [autoTextInput, setAutoTextInput] = useState("");
   const [autoTexts, setAutoTexts] = useState<AutoText[]>([]);
 
@@ -39,31 +54,34 @@ export function PromptEditor({ promptId, promptData, onSave }: PromptEditorProps
     if (promptData) {
       setName(promptData.name);
       setPrompt(promptData.prompt);
+      setFolderId(promptData.folderId || "none");
       setAutoTexts(promptData.autoTexts || []);
     } else {
       // 새 프롬프트
       setName("");
       setPrompt("");
+      setFolderId("none");
       setAutoTexts([]);
     }
   }, [promptData]);
 
   const handleAddAutoText = () => {
-    if (!autoTextInput.trim()) return;
+    const trigger = autoTextInput.trim();
+    if (!trigger) return;
 
-    const parts = autoTextInput.split(":");
-    if (parts.length < 2) {
-      alert('올바른 형식으로 입력해주세요. 예: "단축키:변환될 텍스트"');
+    if (trigger.length < 2) {
+      alert('트리거는 최소 2자 이상이어야 합니다.');
       return;
     }
 
-    const shortcut = parts[0].trim();
-    const text = parts.slice(1).join(":").trim();
-
-    if (shortcut && text) {
-      setAutoTexts([...autoTexts, { shortcut, text }]);
-      setAutoTextInput("");
+    // 중복 체크
+    if (autoTexts.some(at => at.shortcut === trigger)) {
+      alert('이미 등록된 트리거입니다.');
+      return;
     }
+
+    setAutoTexts([...autoTexts, { shortcut: trigger, text: prompt }]);
+    setAutoTextInput("");
   };
 
   const handleRemoveAutoText = (index: number) => {
@@ -76,7 +94,7 @@ export function PromptEditor({ promptId, promptData, onSave }: PromptEditorProps
       return;
     }
 
-    onSave({ name, prompt, autoTexts });
+    onSave({ name, prompt, autoTexts, folderId: folderId === "none" ? undefined : folderId });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -99,16 +117,34 @@ export function PromptEditor({ promptId, promptData, onSave }: PromptEditorProps
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* Prompt Name */}
+        {/* Prompt Name and Folder */}
         <div className="space-y-2">
           <Label htmlFor="prompt-name">프롬프트 이름</Label>
-          <Input
-            id="prompt-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="프롬프트 이름을 입력하세요"
-            className="bg-input-background border-border"
-          />
+          <div className="flex gap-2">
+            <Input
+              id="prompt-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="프롬프트 이름을 입력하세요"
+              className="bg-input-background border-border flex-1"
+            />
+            <Select
+              value={folderId}
+              onValueChange={(value: string) => setFolderId(value === "none" ? "none" : value)}
+            >
+              <SelectTrigger className="w-[200px] bg-input-background border-border">
+                <SelectValue placeholder="폴더 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">폴더 없음</SelectItem>
+                {folders.map((folder) => (
+                  <SelectItem key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Prompt Content */}
@@ -132,7 +168,7 @@ export function PromptEditor({ promptId, promptData, onSave }: PromptEditorProps
               value={autoTextInput}
               onChange={(e) => setAutoTextInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder='예: "이메일:user@example.com"'
+              placeholder='트리거 입력 (예: @h1, @@, front)'
               className="bg-input-background border-border"
             />
             <Button onClick={handleAddAutoText} type="button" variant="outline">
@@ -142,28 +178,22 @@ export function PromptEditor({ promptId, promptData, onSave }: PromptEditorProps
 
           {autoTexts.length > 0 && (
             <div className="mt-4 space-y-2">
-              <p className="text-sm text-muted-foreground">등록된 자동변환 텍스트</p>
-              <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">등록된 트리거 (입력 시 프롬프트 전체가 자동 완성됩니다)</p>
+              <div className="flex flex-wrap gap-2">
                 {autoTexts.map((item, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-3 bg-accent rounded-lg border border-border"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="px-2 py-1 bg-primary text-primary-foreground rounded text-sm">
-                        {item.shortcut}
-                      </span>
-                      <span className="text-muted-foreground">→</span>
-                      <span>{item.text}</span>
-                    </div>
-                    <Button
+                    <span>{item.shortcut}</span>
+                    <button
                       onClick={() => handleRemoveAutoText(index)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
+                      className="hover:bg-primary-foreground/20 rounded-sm p-0.5"
                     >
-                      삭제
-                    </Button>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
                 ))}
               </div>

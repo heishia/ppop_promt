@@ -3,7 +3,7 @@
  * 
  * ppop_promt 데스크탑 애플리케이션의 메인 프로세스입니다.
  */
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, screen } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -43,9 +43,35 @@ function startBackend() {
 
 // 메인 윈도우 생성
 function createWindow() {
+    // 현재 모니터의 해상도 가져오기
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    
+    // 기준 해상도: 1920x1080에서 950x600
+    const baseScreenWidth = 1920;
+    const baseScreenHeight = 1080;
+    const baseWindowWidth = 950;
+    const baseWindowHeight = 600;
+    
+    // 해상도 비율에 따른 창 크기 계산
+    const widthRatio = baseWindowWidth / baseScreenWidth;
+    const heightRatio = baseWindowHeight / baseScreenHeight;
+    
+    let windowWidth = Math.round(screenWidth * widthRatio);
+    let windowHeight = Math.round(screenHeight * heightRatio);
+    
+    // 최대 크기 제한 (화면의 90%)
+    const maxWidth = Math.round(screenWidth * 0.9);
+    const maxHeight = Math.round(screenHeight * 0.9);
+    windowWidth = Math.min(windowWidth, maxWidth);
+    windowHeight = Math.min(windowHeight, maxHeight);
+    
+    console.log(`화면 해상도: ${screenWidth}x${screenHeight}`);
+    console.log(`창 크기: ${windowWidth}x${windowHeight}`);
+    
     mainWindow = new BrowserWindow({
-        width: 900,
-        height: 600,
+        width: windowWidth,
+        height: windowHeight,
         icon: path.join(__dirname, 'public', 'icon.ico'),
         webPreferences: {
             nodeIntegration: false,

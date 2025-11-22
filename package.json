@@ -8,7 +8,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "electron .",
-    "build:backend": "python build_backend.py",
+    "build:backend": "python backend/build_backend.py",
     "build:frontend": "cd frontend && npm run build",
     "build:electron": "electron-builder",
     "build": "npm run build:backend && npm run build:frontend && npm run build:electron"

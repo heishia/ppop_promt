@@ -13,14 +13,19 @@ def build_backend():
     """백엔드를 PyInstaller로 빌드"""
     print("🔨 백엔드 빌드를 시작합니다...")
     
+    # 현재 스크립트 위치 (backend 디렉토리)
+    backend_dir = Path(__file__).parent
     # 프로젝트 루트
-    root_dir = Path(__file__).parent
-    backend_dir = root_dir / "backend"
+    root_dir = backend_dir.parent
     spec_file = backend_dir / "build.spec"
     
     # run.py를 backend 디렉토리로 임시 복사
     run_py_src = root_dir / "run.py"
     run_py_dest = backend_dir / "run.py"
+    
+    if not run_py_src.exists():
+        print(f"❌ run.py를 찾을 수 없습니다: {run_py_src}")
+        return False
     
     print(f"📋 run.py를 복사합니다: {run_py_src} -> {run_py_dest}")
     shutil.copy2(run_py_src, run_py_dest)
@@ -65,4 +70,3 @@ def build_backend():
 if __name__ == "__main__":
     success = build_backend()
     sys.exit(0 if success else 1)
-

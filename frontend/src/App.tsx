@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PromptSidebar } from "./components/PromptSidebar";
 import { PromptEditor } from "./components/PromptEditor";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { Toaster } from "./components/ui/sonner";
+import { GripVertical } from "lucide-react";
 
 interface Prompt {
   id: string;
@@ -19,6 +20,8 @@ interface FolderType {
 
 export default function App() {
   const [selectedPromptId, setSelectedPromptId] = useState<string | undefined>();
+  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [isResizing, setIsResizing] = useState(false);
   const [folders, setFolders] = useState<FolderType[]>([
     { id: "1", name: "작업용 프롬프트" },
     { id: "2", name: "자주 사용" },
@@ -36,7 +39,7 @@ export default function App() {
 
   const handleDeletePrompt = (id: string) => {
     setPrompts(prompts.filter(p => p.id !== id));
-    toast.success("프롬프트가 삭제되었습니다.");
+    toast.success("삭제 완료");
     if (selectedPromptId === id) {
       setSelectedPromptId(undefined);
     }
@@ -44,13 +47,14 @@ export default function App() {
 
   const handleNewPrompt = () => {
     setSelectedPromptId(undefined);
-    toast.success("새 프롬프트를 작성할 수 있습니다.");
+    toast.success("새 프롬프트 작성 가능");
   };
 
   const handleSavePrompt = (data: {
     name: string;
     prompt: string;
     autoTexts: Array<{ shortcut: string; text: string }>;
+    folderId?: string;
   }) => {
     if (selectedPromptId) {
       // 기존 프롬프트 수정
@@ -59,17 +63,16 @@ export default function App() {
           ? { ...p, ...data }
           : p
       ));
-      toast.success("프롬프트가 수정되었습니다.");
+      toast.success("수정 완료");
     } else {
       // 새 프롬프트 생성
       const newPrompt: Prompt = {
         id: `p-${Date.now()}`,
         ...data,
-        folderId: undefined,
       };
       setPrompts([...prompts, newPrompt]);
       setSelectedPromptId(newPrompt.id);
-      toast.success("프롬프트가 저장되었습니다.");
+      toast.success("저장 완료");
     }
   };
 
@@ -87,25 +90,98 @@ export default function App() {
     ));
   };
 
+  const handleDeleteFolder = (folderId: string) => {
+    // 폴더와 함께 폴더 안의 프롬프트들도 모두 삭제
+    setPrompts(prompts.filter(p => p.folderId !== folderId));
+    setFolders(folders.filter(f => f.id !== folderId));
+    toast.success("삭제 완료");
+  };
+
+  const handleMovePrompt = (promptId: string, targetFolderId?: string) => {
+    setPrompts(prompts.map(p => 
+      p.id === promptId ? { ...p, folderId: targetFolderId } : p
+    ));
+    toast.success("이동 완료");
+  };
+
+  const handleMouseDown = () => {
+    setIsResizing(true);
+  };
+
+  // 리사이징 이벤트 리스너 추가
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = e.clientX;
+      if (newWidth >= 200 && newWidth <= 600) {
+        setSidebarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isResizing]);
+
   const selectedPrompt = prompts.find(p => p.id === selectedPromptId);
 
   return (
     <div className="h-screen flex overflow-hidden">
-      <PromptSidebar
-        selectedPromptId={selectedPromptId}
-        onSelectPrompt={handleSelectPrompt}
-        onDeletePrompt={handleDeletePrompt}
-        onNewPrompt={handleNewPrompt}
-        folders={folders}
-        prompts={prompts}
-        onAddFolder={handleAddFolder}
-        onUpdateFolder={handleUpdateFolder}
-      />
-      <PromptEditor 
-        promptId={selectedPromptId} 
-        promptData={selectedPrompt}
-        onSave={handleSavePrompt} 
-      />
+      <div style={{ width: `${sidebarWidth}px`, flexShrink: 0 }}>
+        <PromptSidebar
+          selectedPromptId={selectedPromptId}
+          onSelectPrompt={handleSelectPrompt}
+          onDeletePrompt={handleDeletePrompt}
+          onNewPrompt={handleNewPrompt}
+          folders={folders}
+          prompts={prompts}
+          onAddFolder={handleAddFolder}
+          onUpdateFolder={handleUpdateFolder}
+          onDeleteFolder={handleDeleteFolder}
+          onMovePrompt={handleMovePrompt}
+        />
+      </div>
+      <div
+        className="relative group flex-shrink-0 cursor-col-resize h-full"
+        style={{ width: '8px' }}
+        onMouseDown={handleMouseDown}
+      >
+        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-border" />
+        <div
+          className="absolute inset-0 group-hover:bg-primary/10 transition-colors"
+          style={{ userSelect: 'none' }}
+        />
+        <div 
+          className="absolute top-1/2 -translate-y-1/2"
+          style={{ 
+            left: '-7px',
+            pointerEvents: 'none'
+          }}
+        >
+          <div className={`bg-background border border-border rounded-sm px-0.5 py-4 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity ${
+            isResizing ? 'opacity-100 bg-primary border-primary' : ''
+          }`}>
+            <GripVertical className={`w-3 h-12 ${isResizing ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <PromptEditor 
+          promptId={selectedPromptId} 
+          promptData={selectedPrompt}
+          folders={folders}
+          onSave={handleSavePrompt} 
+        />
+      </div>
       <Toaster />
     </div>
   );

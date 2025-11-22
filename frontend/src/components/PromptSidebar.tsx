@@ -24,6 +24,8 @@ interface PromptSidebarProps {
   prompts: Prompt[];
   onAddFolder: (name: string) => void;
   onUpdateFolder: (folderId: string, name: string) => void;
+  onDeleteFolder: (folderId: string) => void;
+  onMovePrompt: (promptId: string, targetFolderId?: string) => void;
 }
 
 export function PromptSidebar({
@@ -35,11 +37,15 @@ export function PromptSidebar({
   prompts,
   onAddFolder,
   onUpdateFolder,
+  onDeleteFolder,
+  onMovePrompt,
 }: PromptSidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["1", "2"]));
   const [searchQuery, setSearchQuery] = useState("");
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState("");
+  const [draggedPromptId, setDraggedPromptId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
   const toggleFolder = (folderId: string) => {
     const newExpanded = new Set(expandedFolders);
@@ -90,8 +96,37 @@ export function PromptSidebar({
     return filteredPrompts.some(fp => fp.id === prompt.id);
   };
 
+  const handleDragStart = (e: React.DragEvent, promptId: string) => {
+    setDraggedPromptId(promptId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPromptId(null);
+    setDragOverFolderId(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, folderId?: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverFolderId(folderId || 'uncategorized');
+  };
+
+  const handleDragLeave = () => {
+    setDragOverFolderId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetFolderId?: string) => {
+    e.preventDefault();
+    if (draggedPromptId) {
+      onMovePrompt(draggedPromptId, targetFolderId);
+    }
+    setDraggedPromptId(null);
+    setDragOverFolderId(null);
+  };
+
   return (
-    <div className="w-80 border-r border-border bg-sidebar h-full flex flex-col">
+    <div className="w-full border-r border-border bg-sidebar h-full flex flex-col">
       <div className="p-4 border-b border-sidebar-border space-y-3">
         <Button onClick={onNewPrompt} className="w-full" size="sm">
           <Plus className="w-4 h-4 mr-2" />
@@ -113,31 +148,49 @@ export function PromptSidebar({
           {/* Folders */}
           {folders.map((folder) => (
             <div key={folder.id} className="mb-1">
-              <button
-                onClick={() => toggleFolder(folder.id)}
-                onDoubleClick={() => handleFolderDoubleClick(folder)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-sidebar-accent transition-colors"
+              <div
+                className={`group w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-sidebar-accent transition-colors ${
+                  dragOverFolderId === folder.id ? 'bg-primary/20 ring-2 ring-primary' : ''
+                }`}
+                onDragOver={(e) => handleDragOver(e, folder.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, folder.id)}
               >
-                {expandedFolders.has(folder.id) ? (
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                )}
-                <Folder className="w-4 h-4 text-primary" />
-                {editingFolderId === folder.id ? (
-                  <Input
-                    value={editingFolderName}
-                    onChange={(e) => setEditingFolderName(e.target.value)}
-                    onBlur={() => handleFolderNameSubmit(folder.id)}
-                    onKeyDown={(e) => handleFolderNameKeyDown(e, folder.id)}
-                    className="flex-1 h-6 px-2 py-0"
-                    autoFocus
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <span className="flex-1 text-left">{folder.name}</span>
-                )}
-              </button>
+                <button
+                  onClick={() => toggleFolder(folder.id)}
+                  onDoubleClick={() => handleFolderDoubleClick(folder)}
+                  className="flex items-center gap-2 flex-1 min-w-0"
+                >
+                  {expandedFolders.has(folder.id) ? (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  )}
+                  <Folder className="w-4 h-4 text-primary flex-shrink-0" />
+                  {editingFolderId === folder.id ? (
+                    <Input
+                      value={editingFolderName}
+                      onChange={(e) => setEditingFolderName(e.target.value)}
+                      onBlur={() => handleFolderNameSubmit(folder.id)}
+                      onKeyDown={(e) => handleFolderNameKeyDown(e, folder.id)}
+                      className="flex-1 h-6 px-2 py-0"
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span className="flex-1 text-left truncate">{folder.name}</span>
+                  )}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteFolder(folder.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 transition-opacity flex-shrink-0"
+                >
+                  <Trash2 className="w-3 h-3 text-destructive" />
+                </button>
+              </div>
 
               {expandedFolders.has(folder.id) && (
                 <div className="ml-6 mt-1">
@@ -145,11 +198,14 @@ export function PromptSidebar({
                     isPromptVisible(prompt) && (
                       <div
                         key={prompt.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, prompt.id)}
+                        onDragEnd={handleDragEnd}
                         className={`flex items-center gap-2 px-3 py-2 rounded-md group cursor-pointer transition-colors ${
                           selectedPromptId === prompt.id
                             ? "bg-primary text-primary-foreground"
                             : "hover:bg-sidebar-accent"
-                        }`}
+                        } ${draggedPromptId === prompt.id ? 'opacity-50' : ''}`}
                         onClick={() => onSelectPrompt(prompt.id)}
                       >
                         <span className="flex-1 truncate">{prompt.name}</span>
@@ -175,16 +231,28 @@ export function PromptSidebar({
           {/* Prompts without folder */}
           {getPromptsInFolder(undefined).length > 0 && (
             <div className="mt-4">
-              <div className="px-3 py-2 text-xs text-muted-foreground">미분류</div>
+              <div 
+                className={`px-3 py-2 text-xs text-muted-foreground ${
+                  dragOverFolderId === 'uncategorized' ? 'bg-primary/20 ring-2 ring-primary rounded-md' : ''
+                }`}
+                onDragOver={(e) => handleDragOver(e, undefined)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, undefined)}
+              >
+                미분류
+              </div>
               {getPromptsInFolder(undefined).map((prompt) => (
                 isPromptVisible(prompt) && (
                   <div
                     key={prompt.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, prompt.id)}
+                    onDragEnd={handleDragEnd}
                     className={`flex items-center gap-2 px-3 py-2 rounded-md group cursor-pointer transition-colors ${
                       selectedPromptId === prompt.id
                         ? "bg-primary text-primary-foreground"
                         : "hover:bg-sidebar-accent"
-                    }`}
+                    } ${draggedPromptId === prompt.id ? 'opacity-50' : ''}`}
                     onClick={() => onSelectPrompt(prompt.id)}
                   >
                     <span className="flex-1 truncate">{prompt.name}</span>
