@@ -1,25 +1,8 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "./ui/button";
-import { Label } from "./ui/label";
-import { Input } from "./ui/input";
-import { Textarea } from "./ui/textarea";
 import { Progress } from "./ui/progress";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "./ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import { ArrowLeft, Mail, Bug, ExternalLink, Send, Download, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Mail, Bug, ExternalLink, Download, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAutoUpdater } from "../hooks/useAutoUpdater";
 import { toast } from "sonner";
 
@@ -28,59 +11,88 @@ interface InfoPageProps {
 }
 
 export function InfoPage({ onBack }: InfoPageProps) {
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [bugReportOpen, setBugReportOpen] = useState(false);
-  const [feedbackContent, setFeedbackContent] = useState("");
-  const [bugScreenshot, setBugScreenshot] = useState<File | null>(null);
-  const [bugSituation, setBugSituation] = useState("");
-  const [bugDevice, setBugDevice] = useState("");
+  const [showEmailButtons, setShowEmailButtons] = useState<'feedback' | 'bug' | null>(null);
+  const [appVersion, setAppVersion] = useState<string>('1.0.0');
   
   const { status, checkForUpdates, downloadUpdate, installUpdate } = useAutoUpdater();
 
-  // 컴포넌트 마운트 시 업데이트 체크 (Electron 환경에서만)
+  // 컴포넌트 마운트 시 업데이트 체크 및 버전 정보 가져오기 (Electron 환경에서만)
   useEffect(() => {
     if (window.electronAPI) {
       checkForUpdates();
+      // 앱 버전 정보 가져오기
+      window.electronAPI.getVersion?.().then((version: string) => {
+        setAppVersion(version);
+      }).catch(() => {
+        // 버전 정보를 가져올 수 없는 경우 기본값 사용
+        setAppVersion('1.0.0');
+      });
     }
   }, [checkForUpdates]);
 
-  const handleFeedbackSubmit = () => {
-    if (!feedbackContent.trim()) {
-      alert("건의사항을 입력해주세요.");
-      return;
-    }
-
-    const subject = encodeURIComponent("PPOP Prompt 피드백");
-    const body = encodeURIComponent(`건의사항:\n${feedbackContent}`);
-    const mailtoLink = `mailto:bluejin1130@gmail.com?subject=${subject}&body=${body}`;
-    
-    window.open(mailtoLink, '_blank');
-    setFeedbackOpen(false);
-    setFeedbackContent("");
+  const handleFeedbackClick = () => {
+    // 이메일 선택 버튼 표시
+    setShowEmailButtons(showEmailButtons === 'feedback' ? null : 'feedback');
   };
 
-  const handleBugReportSubmit = () => {
-    if (!bugSituation.trim()) {
-      alert("상황을 입력해주세요.");
-      return;
-    }
-
-    const subject = encodeURIComponent("PPOP Prompt 버그 제보");
-    let body = encodeURIComponent(`상황:\n${bugSituation}\n\n사용 기기: ${bugDevice || "미선택"}\n\n스크린샷: ${bugScreenshot ? bugScreenshot.name : "첨부 안 함"}`);
-    const mailtoLink = `mailto:bluejin1130@gmail.com?subject=${subject}&body=${body}`;
-    
-    window.open(mailtoLink, '_blank');
-    setBugReportOpen(false);
-    setBugScreenshot(null);
-    setBugSituation("");
-    setBugDevice("");
+  const handleBugReportClick = () => {
+    // 이메일 선택 버튼 표시
+    setShowEmailButtons(showEmailButtons === 'bug' ? null : 'bug');
   };
 
-  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setBugScreenshot(e.target.files[0]);
+  const openEmailService = (service: 'naver' | 'google', type: 'feedback' | 'bug') => {
+    const recipient = 'bluejin1130@gmail.com';
+    let emailUrl = '';
+
+    if (type === 'feedback') {
+      const subject = encodeURIComponent("PPOP Prompt 피드백");
+      const body = encodeURIComponent(
+        `안녕하세요.\n\n` +
+        `PPOP Prompt 앱에 대한 피드백을 보내드립니다.\n\n` +
+        `---\n` +
+        `이 메일은 PPOP Prompt 앱에서 전송되었습니다.`
+      );
+
+      if (service === 'naver') {
+        emailUrl = `https://mail.naver.com/write/popup?to=${recipient}&subject=${subject}&body=${body}`;
+      } else {
+        emailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&su=${subject}&body=${body}`;
+      }
+    } else {
+      // 버그 제보
+      const subject = encodeURIComponent("PPOP Prompt 버그 제보");
+      const body = encodeURIComponent(
+        `안녕하세요.\n\n` +
+        `PPOP Prompt 앱에서 발견한 버그를 제보합니다.\n\n` +
+        `---\n` +
+        `스크린샷이 있다면 이메일에 첨부해주세요.\n` +
+        `스크린샷을 첨부하시면 문제 해결에 큰 도움이 됩니다.\n\n` +
+        `---\n` +
+        `이 메일은 PPOP Prompt 앱에서 전송되었습니다.`
+      );
+
+      if (service === 'naver') {
+        emailUrl = `https://mail.naver.com/write/popup?to=${recipient}&subject=${subject}&body=${body}`;
+      } else {
+        emailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&su=${subject}&body=${body}`;
+      }
     }
+
+    // 버튼 숨기기
+    setShowEmailButtons(null);
+
+    // Electron 환경에서는 shell.openExternal 사용
+    if (window.electronAPI?.shell?.openExternal) {
+      window.electronAPI.shell.openExternal(emailUrl);
+    } else {
+      // 웹 환경에서는 새 창으로 열기
+      window.open(emailUrl, '_blank');
+    }
+
+    toast.success(`${service === 'naver' ? '네이버' : '구글'} 메일로 이동합니다.`);
   };
+
+
 
   return (
     <div className="flex-1 h-full flex flex-col bg-white">
@@ -109,9 +121,15 @@ export function InfoPage({ onBack }: InfoPageProps) {
         <div className="text-center" style={{ marginBottom: '3rem' }}>
           <div className="flex justify-center" style={{ marginBottom: '1rem' }}>
             <Button
-              onClick={() => setFeedbackOpen(true)}
+              type="button"
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleFeedbackClick();
+              }}
               variant="outline"
-              className="w-auto"
+              className="w-auto cursor-pointer"
+              style={{ pointerEvents: 'auto', zIndex: 10 }}
             >
               <Mail className="w-4 h-4 mr-2" />
               피드백 보내기
@@ -127,9 +145,15 @@ export function InfoPage({ onBack }: InfoPageProps) {
         <div className="text-center" style={{ marginBottom: '3rem' }}>
           <div className="flex justify-center" style={{ marginBottom: '1rem' }}>
             <Button
-              onClick={() => setBugReportOpen(true)}
+              type="button"
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleBugReportClick();
+              }}
               variant="outline"
-              className="w-auto"
+              className="w-auto cursor-pointer"
+              style={{ pointerEvents: 'auto', zIndex: 10 }}
             >
               <Bug className="w-4 h-4 mr-2 text-destructive" />
               버그 제보
@@ -257,109 +281,76 @@ export function InfoPage({ onBack }: InfoPageProps) {
             개인 용도로만 무료로 사용할 수 있습니다. 상업적 활용은 불가합니다.
           </p>
           <p className="text-xs text-muted-foreground">
-            Version 1.0.0
+            Version {appVersion}
           </p>
         </div>
       </div>
 
-      {/* 피드백 다이얼로그 */}
-      <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>피드백 보내기</DialogTitle>
-            <DialogDescription>
-              네이버 또는 구글 이메일로 보내실 수 있습니다.<br />
-              이메일 주소(bluejin1130@gmail.com)가 자동으로 입력됩니다.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="feedback-content">건의사항</Label>
-              <Textarea
-                id="feedback-content"
-                value={feedbackContent}
-                onChange={(e) => setFeedbackContent(e.target.value)}
-                placeholder="개선이 필요한 부분이나 새로운 기능에 대한 아이디어를 입력해주세요."
-                className="min-h-[200px] bg-input-background border-border resize-none"
-              />
+      {/* 이메일 선택 플로팅 박스 - Portal로 body에 직접 렌더링 */}
+      {showEmailButtons && typeof window !== 'undefined' && createPortal(
+        <>
+          {/* 배경 오버레이 */}
+          <div
+            onClick={() => setShowEmailButtons(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100vw',
+              height: '100vh',
+              backgroundColor: 'rgba(0, 0, 0, 0.2)',
+              zIndex: 9998,
+            }}
+          />
+          {/* 플로팅 박스 - 뷰포트 정확한 중앙 */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              border: '1px solid #e5e7eb',
+              padding: '24px',
+              minWidth: '280px',
+              zIndex: 9999,
+            }}
+          >
+            <div className="flex flex-col gap-3">
+              <Button
+                type="button"
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openEmailService('naver', showEmailButtons);
+                }}
+                className="w-full justify-start bg-[#03C75A] hover:bg-[#02B350] text-white border-0 shadow-md hover:shadow-lg transition-all"
+              >
+                <span className="font-bold mr-2">N</span>
+                네이버로 메일보내기
+              </Button>
+              <Button
+                type="button"
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openEmailService('google', showEmailButtons);
+                }}
+                className="w-full justify-start bg-[#4285F4] hover:bg-[#357AE8] text-white border-0 shadow-md hover:shadow-lg transition-all"
+              >
+                <span className="font-bold mr-2">G</span>
+                구글로 메일보내기
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFeedbackOpen(false)}>
-              취소
-            </Button>
-            <Button onClick={handleFeedbackSubmit}>
-              <Send className="w-4 h-4 mr-2" />
-              이메일로 보내기
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 버그 제보 다이얼로그 */}
-      <Dialog open={bugReportOpen} onOpenChange={setBugReportOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>버그 제보</DialogTitle>
-            <DialogDescription>
-              네이버 또는 구글 이메일로 보내실 수 있습니다.<br />
-              이메일 주소(bluejin1130@gmail.com)가 자동으로 입력됩니다.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="bug-screenshot">스크린샷 (선택사항)</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="bug-screenshot"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleScreenshotChange}
-                  className="bg-input-background border-border"
-                />
-                {bugScreenshot && (
-                  <span className="text-sm text-muted-foreground">
-                    {bugScreenshot.name}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bug-situation">상황 *</Label>
-              <Textarea
-                id="bug-situation"
-                value={bugSituation}
-                onChange={(e) => setBugSituation(e.target.value)}
-                placeholder="발생한 오류나 예상치 못한 동작을 자세히 설명해주세요."
-                className="min-h-[150px] bg-input-background border-border resize-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bug-device">사용 기기 (선택사항)</Label>
-              <Select value={bugDevice} onValueChange={setBugDevice}>
-                <SelectTrigger className="bg-input-background border-border">
-                  <SelectValue placeholder="사용 기기를 선택해주세요" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="windows">Windows</SelectItem>
-                  <SelectItem value="macos">macOS</SelectItem>
-                  <SelectItem value="linux">Linux</SelectItem>
-                  <SelectItem value="other">기타</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBugReportOpen(false)}>
-              취소
-            </Button>
-            <Button onClick={handleBugReportSubmit}>
-              <Send className="w-4 h-4 mr-2" />
-              이메일로 보내기
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </>,
+        document.body
+      )}
     </div>
   );
 }

@@ -47,5 +47,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('update-downloaded', (event, data) => callback(data));
         return () => ipcRenderer.removeListener('update-downloaded', callback);
     },
+    
+    // 외부 링크 열기 (mailto 등)
+    shell: {
+        openExternal: (url) => ipcRenderer.invoke('open-external', url),
+    },
+    
+    // 앱 버전 정보 가져오기
+    getVersion: () => ipcRenderer.invoke('get-app-version'),
 });
 

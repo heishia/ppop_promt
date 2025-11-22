@@ -11,6 +11,10 @@ interface ElectronAPI {
   onUpdateError: (callback: (data: { message: string }) => void) => () => void;
   onUpdateDownloadProgress: (callback: (data: { percent: number; transferred: number; total: number }) => void) => () => void;
   onUpdateDownloaded: (callback: (data: { version: string }) => void) => () => void;
+  shell?: {
+    openExternal: (url: string) => Promise<{ success?: boolean; error?: string }>;
+  };
+  getVersion?: () => Promise<string>;
 }
 
 declare global {

@@ -3,7 +3,7 @@
  * 
  * ppop_promt 데스크탑 애플리케이션의 메인 프로세스입니다.
  */
-const { app, BrowserWindow, screen, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
@@ -147,6 +147,21 @@ function setupIpcHandlers() {
     // 앱 재시작 및 업데이트 설치
     ipcMain.handle('quit-and-install', () => {
         autoUpdater.quitAndInstall(false, true);
+    });
+
+    // 외부 링크 열기 (mailto 등)
+    ipcMain.handle('open-external', async (event, url) => {
+        try {
+            await shell.openExternal(url);
+            return { success: true };
+        } catch (error) {
+            return { error: error.message };
+        }
+    });
+
+    // 앱 버전 정보 가져오기
+    ipcMain.handle('get-app-version', () => {
+        return app.getVersion();
     });
 }
 
