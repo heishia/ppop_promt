@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { PromptSidebar } from "./components/PromptSidebar";
 import { PromptEditor } from "./components/PromptEditor";
+import { WelcomeScreen } from "./components/WelcomeScreen";
+import { InfoPage } from "./components/InfoPage";
 import { toast } from "sonner";
 import { Toaster } from "./components/ui/sonner";
 import { GripVertical } from "lucide-react";
@@ -20,6 +22,7 @@ interface FolderType {
 
 export default function App() {
   const [selectedPromptId, setSelectedPromptId] = useState<string | undefined>();
+  const [currentView, setCurrentView] = useState<'welcome' | 'editor' | 'info'>('welcome');
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
   const [folders, setFolders] = useState<FolderType[]>([
@@ -35,6 +38,7 @@ export default function App() {
 
   const handleSelectPrompt = (id: string) => {
     setSelectedPromptId(id);
+    setCurrentView('editor');
   };
 
   const handleDeletePrompt = (id: string) => {
@@ -42,11 +46,13 @@ export default function App() {
     toast.success("삭제 완료");
     if (selectedPromptId === id) {
       setSelectedPromptId(undefined);
+      setCurrentView('welcome');
     }
   };
 
   const handleNewPrompt = () => {
     setSelectedPromptId(undefined);
+    setCurrentView('editor');
     toast.success("새 프롬프트 작성 가능");
   };
 
@@ -72,6 +78,7 @@ export default function App() {
       };
       setPrompts([...prompts, newPrompt]);
       setSelectedPromptId(newPrompt.id);
+      setCurrentView('editor');
       toast.success("저장 완료");
     }
   };
@@ -134,6 +141,34 @@ export default function App() {
 
   const selectedPrompt = prompts.find(p => p.id === selectedPromptId);
 
+  const handleLogoClick = () => {
+    setCurrentView('info');
+  };
+
+  const handleBackToWelcome = () => {
+    setCurrentView('welcome');
+  };
+
+  const renderMainContent = () => {
+    if (currentView === 'info') {
+      return <InfoPage onBack={handleBackToWelcome} />;
+    }
+    
+    if (currentView === 'editor') {
+      return (
+        <PromptEditor 
+          promptId={selectedPromptId} 
+          promptData={selectedPrompt}
+          folders={folders}
+          onSave={handleSavePrompt} 
+        />
+      );
+    }
+    
+    // currentView === 'welcome'
+    return <WelcomeScreen onLogoClick={handleLogoClick} />;
+  };
+
   return (
     <div className="h-screen flex overflow-hidden">
       <div style={{ width: `${sidebarWidth}px`, flexShrink: 0 }}>
@@ -175,12 +210,7 @@ export default function App() {
         </div>
       </div>
       <div className="flex-1 min-w-0">
-        <PromptEditor 
-          promptId={selectedPromptId} 
-          promptData={selectedPrompt}
-          folders={folders}
-          onSave={handleSavePrompt} 
-        />
+        {renderMainContent()}
       </div>
       <Toaster />
     </div>

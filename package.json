@@ -15,7 +15,8 @@
   },
   "devDependencies": {
     "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "electron-updater": "^6.1.7"
   },
   "build": {
     "appId": "com.ppop_promt.app",
@@ -25,6 +26,7 @@
     },
     "files": [
       "electron.js",
+      "preload.js",
       "frontend/dist/**/*",
       "public/**/*"
     ],
@@ -45,7 +47,14 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "heishia",
+        "repo": "ppop_promt"
+      }
+    ]
   }
 }
 
