@@ -66,6 +66,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='../public/logo.png'
+    icon='../public/logo.ico'
 )
 
