@@ -83,7 +83,7 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
-        icon: path.join(__dirname, 'public', 'logo2.ico'),
+        icon: path.join(__dirname, 'public', 'logo.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -248,6 +248,12 @@ autoUpdater.on('update-downloaded', (info) => {
         }
     });
 });
+
+// 앱 아이콘 설정 (Windows에서 라운딩 자동 적용)
+if (process.platform === 'win32') {
+    // Windows에서 앱 아이콘 설정
+    app.setAppUserModelId('com.ppop_promt.app');
+}
 
 // 앱 준비 완료
 app.whenReady().then(() => {
