@@ -8,16 +8,17 @@
   "license": "MIT",
   "scripts": {
     "dev": "electron .",
+    "clean": "node clean.js",
     "build:backend": "python backend/build_backend.py",
     "build:frontend": "cd frontend && npm run build",
-    "build:electron": "node -r dotenv/config node_modules/.bin/electron-builder",
-    "build": "npm run build:backend && npm run build:frontend && npm run build:electron"
+    "build:electron": "node -r dotenv/config node_modules/electron-builder/cli.js",
+    "build": "npm run clean && npm run build:backend && npm run build:frontend && npm run build:electron"
   },
   "devDependencies": {
+    "dotenv": "^16.3.1",
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1",
-    "electron-updater": "^6.1.7",
-    "dotenv": "^16.3.1"
+    "electron-updater": "^6.1.7"
   },
   "build": {
     "appId": "com.ppop_promt.app",
@@ -58,5 +59,3 @@
     ]
   }
 }
-
-
