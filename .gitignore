@@ -8,23 +8,44 @@ __pycache__/
 venv/
 ENV/
 env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg
+dist-eggs/
 
 # Node
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
+lerna-debug.log*
+.npm
+.eslintcache
 
 # Build
 dist/
 build/
 frontend/dist/
+frontend/build/
 backend/dist/
 backend/build/
 resources/
+*.log
 
 # Electron
 out/
+app/
+packages/
+*.app
+*.dmg
+*.exe.blockmap
+*.yml
+builder-debug.yml
+builder-effective-config.yaml
 
 # PyInstaller
 *.spec.bak
@@ -35,10 +56,15 @@ backend/run.py
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
 
 # Database
 *.db
@@ -48,3 +74,18 @@ Thumbs.db
 # Environment
 .env
 .env.local
+.env.*.local
+.env.production
+.env.development
+
+# Certificates
+*.pfx
+certificate.pfx
+*.p12
+*.cer
+*.crt
+*.key
+certificate-thumbprint.txt
+
+# Electron Builder Cache
+.electron-builder-cache/

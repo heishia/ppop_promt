@@ -51,6 +51,17 @@ const run = async () => {
     console.log(`⏭️  건너뜀: electron-builder 캐시 (존재하지 않음)`);
   }
   
+  // winCodeSign 캐시 정리 (Windows만)
+  if (process.platform === 'win32') {
+    const winCodeSignCachePath = path.join(os.homedir(), 'AppData', 'Local', 'electron-builder', 'Cache', 'winCodeSign');
+    try {
+      await rm(winCodeSignCachePath, { recursive: true, force: true });
+      console.log(`✅ 삭제 완료: winCodeSign 캐시 (${winCodeSignCachePath})`);
+    } catch (e) {
+      console.log(`⏭️  건너뜀: winCodeSign 캐시 (존재하지 않음)`);
+    }
+  }
+  
   console.log('\n✨ 정리 완료!');
 };
 

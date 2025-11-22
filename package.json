@@ -65,7 +65,9 @@
       "target": [
         "nsis"
       ],
-      "icon": "public/logo.ico"
+      "icon": "public/logo.ico",
+      "certificateFile": "certificate.pfx",
+      "certificatePassword": "${CSC_KEY_PASSWORD}"
     },
     "nsis": {
       "oneClick": false,
