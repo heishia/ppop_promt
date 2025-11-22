@@ -30,14 +30,23 @@ export function InfoPage({ onBack }: InfoPageProps) {
     }
   }, [checkForUpdates]);
 
+  // 디버깅: showEmailButtons 상태 추적
+  useEffect(() => {
+    console.log('showEmailButtons 상태 변경:', showEmailButtons);
+  }, [showEmailButtons]);
+
   const handleFeedbackClick = () => {
     // 이메일 선택 버튼 표시
+    console.log('피드백 클릭, 현재 상태:', showEmailButtons);
     setShowEmailButtons(showEmailButtons === 'feedback' ? null : 'feedback');
+    console.log('피드백 클릭 후 상태:', showEmailButtons === 'feedback' ? null : 'feedback');
   };
 
   const handleBugReportClick = () => {
     // 이메일 선택 버튼 표시
+    console.log('버그 제보 클릭, 현재 상태:', showEmailButtons);
     setShowEmailButtons(showEmailButtons === 'bug' ? null : 'bug');
+    console.log('버그 제보 클릭 후 상태:', showEmailButtons === 'bug' ? null : 'bug');
   };
 
   const openEmailService = (service: 'naver' | 'google', type: 'feedback' | 'bug') => {
@@ -49,6 +58,9 @@ export function InfoPage({ onBack }: InfoPageProps) {
       const body = encodeURIComponent(
         `안녕하세요.\n\n` +
         `PPOP Prompt 앱에 대한 피드백을 보내드립니다.\n\n` +
+        `---\n` +
+        `건의내용 :\n` +
+        `\n` +
         `---\n` +
         `이 메일은 PPOP Prompt 앱에서 전송되었습니다.`
       );
@@ -64,6 +76,11 @@ export function InfoPage({ onBack }: InfoPageProps) {
       const body = encodeURIComponent(
         `안녕하세요.\n\n` +
         `PPOP Prompt 앱에서 발견한 버그를 제보합니다.\n\n` +
+        `---\n` +
+        `상황 :\n` +
+        `\n` +
+        `사용 기기 :\n` +
+        `\n` +
         `---\n` +
         `스크린샷이 있다면 이메일에 첨부해주세요.\n` +
         `스크린샷을 첨부하시면 문제 해결에 큰 도움이 됩니다.\n\n` +
@@ -287,11 +304,14 @@ export function InfoPage({ onBack }: InfoPageProps) {
       </div>
 
       {/* 이메일 선택 플로팅 박스 - Portal로 body에 직접 렌더링 */}
-      {showEmailButtons && typeof window !== 'undefined' && createPortal(
+      {showEmailButtons && typeof window !== 'undefined' && document.body ? createPortal(
         <>
           {/* 배경 오버레이 */}
           <div
-            onClick={() => setShowEmailButtons(null)}
+            onClick={() => {
+              console.log('배경 클릭 - 플로팅 박스 닫기');
+              setShowEmailButtons(null);
+            }}
             style={{
               position: 'fixed',
               top: 0,
@@ -301,16 +321,19 @@ export function InfoPage({ onBack }: InfoPageProps) {
               width: '100vw',
               height: '100vh',
               backgroundColor: 'rgba(0, 0, 0, 0.2)',
-              zIndex: 9998,
+              zIndex: 99998,
             }}
           />
           {/* 플로팅 박스 - 뷰포트 정확한 중앙 */}
           <div
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('플로팅 박스 클릭, showEmailButtons:', showEmailButtons);
+            }}
             style={{
               position: 'fixed',
-              top: '50%',
-              left: '50%',
+              top: '50vh',
+              left: '50vw',
               transform: 'translate(-50%, -50%)',
               backgroundColor: 'white',
               borderRadius: '8px',
@@ -318,39 +341,81 @@ export function InfoPage({ onBack }: InfoPageProps) {
               border: '1px solid #e5e7eb',
               padding: '24px',
               minWidth: '280px',
-              zIndex: 9999,
+              zIndex: 99999,
             }}
           >
-            <div className="flex flex-col gap-3">
-              <Button
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button
                 type="button"
                 onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  console.log('네이버 버튼 클릭, type:', showEmailButtons);
                   openEmailService('naver', showEmailButtons);
                 }}
-                className="w-full justify-start bg-[#03C75A] hover:bg-[#02B350] text-white border-0 shadow-md hover:shadow-lg transition-all"
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  padding: '10px 16px',
+                  backgroundColor: '#03C75A',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#02B350';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#03C75A';
+                }}
               >
-                <span className="font-bold mr-2">N</span>
+                <span style={{ fontWeight: 'bold', marginRight: '8px' }}>N</span>
                 네이버로 메일보내기
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
                 onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  console.log('구글 버튼 클릭, type:', showEmailButtons);
                   openEmailService('google', showEmailButtons);
                 }}
-                className="w-full justify-start bg-[#4285F4] hover:bg-[#357AE8] text-white border-0 shadow-md hover:shadow-lg transition-all"
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  padding: '10px 16px',
+                  backgroundColor: '#4285F4',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#357AE8';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#4285F4';
+                }}
               >
-                <span className="font-bold mr-2">G</span>
+                <span style={{ fontWeight: 'bold', marginRight: '8px' }}>G</span>
                 구글로 메일보내기
-              </Button>
+              </button>
             </div>
           </div>
         </>,
         document.body
-      )}
+      ) : null}
     </div>
   );
 }
