@@ -36,18 +36,22 @@ class AutoTextWatcher:
     def start(self):
         """자동변환 감지 서비스 시작"""
         if self.running:
+            print("자동변환 텍스트 감지 서비스가 이미 실행 중입니다.")
             return
         
         self.running = True
         self.update_dict_from_api()
+        print(f"자동변환 텍스트 딕셔너리 로드 완료: {len(self.autotext_dict)}개 트리거")
         
         # 백그라운드 스레드 시작
         self.thread = threading.Thread(target=self._watch, daemon=True)
         self.thread.start()
+        print("키보드 감지 스레드 시작 완료")
         
         # 주기적으로 딕셔너리 업데이트하는 스레드
         update_thread = threading.Thread(target=self._periodic_update, daemon=True)
         update_thread.start()
+        print("딕셔너리 업데이트 스레드 시작 완료")
     
     def stop(self):
         """자동변환 감지 서비스 중지"""
@@ -62,6 +66,11 @@ class AutoTextWatcher:
             if response.status_code == 200:
                 with self.lock:
                     self.autotext_dict = response.json()
+                    print(f"자동변환 텍스트 딕셔너리 업데이트 완료: {len(self.autotext_dict)}개 트리거")
+            else:
+                print(f"자동변환 텍스트 딕셔너리 업데이트 실패: HTTP {response.status_code}")
+        except requests.exceptions.ConnectionError:
+            print(f"자동변환 텍스트 딕셔너리 업데이트 실패: API 서버에 연결할 수 없습니다 ({self.api_url})")
         except Exception as e:
             print(f"자동변환 텍스트 딕셔너리 업데이트 실패: {e}")
     
@@ -77,31 +86,55 @@ class AutoTextWatcher:
             if not self.running:
                 return
             
-            if e.event_type == 'down' and e.name is not None:
-                if len(e.name) == 1:
-                    # 일반 문자 입력
-                    self.typed += e.name
+            try:
+                if e.event_type == 'down' and e.name is not None:
                     with self.lock:
-                        for trigger, replacement in self.autotext_dict.items():
-                            if self.typed.endswith(trigger):
+                        if len(e.name) == 1 and e.name.isprintable():
+                            # 일반 문자 입력
+                            self.typed += e.name
+                            # 트리거 텍스트 확인 (가장 긴 매칭 우선)
+                            matched_trigger = None
+                            matched_replacement = None
+                            for trigger, replacement in self.autotext_dict.items():
+                                if self.typed.endswith(trigger):
+                                    if matched_trigger is None or len(trigger) > len(matched_trigger):
+                                        matched_trigger = trigger
+                                        matched_replacement = replacement
+                            
+                            if matched_trigger:
                                 # 트리거 텍스트 삭제
-                                for _ in range(len(trigger)):
+                                for _ in range(len(matched_trigger)):
                                     keyboard.send('backspace')
                                 # 프롬프트 텍스트 붙여넣기
-                                pyperclip.copy(replacement)
-                                time.sleep(0.05)
+                                pyperclip.copy(matched_replacement)
+                                time.sleep(0.1)  # 클립보드 복사 대기 시간 증가
                                 keyboard.send('ctrl+v')
+                                self.typed = self.typed[:-len(matched_trigger)]
+                        elif e.name == 'space':
+                            self.typed += ' '
+                        elif e.name == 'backspace':
+                            self.typed = self.typed[:-1] if len(self.typed) > 0 else ""
+                        elif e.name == 'enter':
+                            self.typed = ""
+                        elif e.name in ['tab', 'shift', 'ctrl', 'alt', 'caps lock', 'esc']:
+                            # 특수 키는 무시
+                            pass
+                        else:
+                            # 기타 키 입력 시 typed 초기화 (트리거 매칭 실패)
+                            if len(self.typed) > 100:  # 너무 길어지면 초기화
                                 self.typed = ""
-                                break
-                elif e.name == 'space':
-                    self.typed += ' '
-                elif e.name == 'backspace':
-                    self.typed = self.typed[:-1] if len(self.typed) > 0 else ""
-                elif e.name == 'enter':
-                    self.typed = ""
+            except Exception as ex:
+                print(f"키보드 이벤트 처리 오류: {ex}")
+                self.typed = ""
         
-        keyboard.hook(on_key)
-        keyboard.wait()
+        try:
+            print("키보드 후크 등록 중...")
+            keyboard.hook(on_key)
+            print("키보드 후크 등록 완료. 키보드 입력 감지 시작.")
+            keyboard.wait()
+        except Exception as ex:
+            print(f"키보드 후크 등록 실패: {ex}")
+            print("참고: Windows에서 키보드 후크를 사용하려면 관리자 권한이 필요할 수 있습니다.")
 
 def start_autotext_watcher(api_url: str = "http://127.0.0.1:8000"):
     """

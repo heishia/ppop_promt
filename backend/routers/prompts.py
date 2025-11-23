@@ -97,8 +97,10 @@ def create_prompt(prompt_data: PromptCreate, db: Session = Depends(get_db)):
     db.add(prompt)
     db.flush()  # ID를 얻기 위해 flush
     
-    # 자동변환 텍스트 추가
-    for autotext_data in prompt_data.autotexts:
+    # 자동변환 텍스트 추가 (하나만 허용)
+    if prompt_data.autotexts and len(prompt_data.autotexts) > 0:
+        # 첫 번째 것만 사용
+        autotext_data = prompt_data.autotexts[0]
         # 중복 체크
         existing = db.query(AutoText).filter(
             AutoText.trigger_text == autotext_data.trigger_text
@@ -158,13 +160,14 @@ def update_prompt(
     if prompt_data.text is not None:
         prompt.text = prompt_data.text
     
-    # 자동변환 텍스트 업데이트
+    # 자동변환 텍스트 업데이트 (하나만 허용)
     if prompt_data.autotexts is not None:
         # 기존 자동변환 텍스트 삭제
         db.query(AutoText).filter(AutoText.prompt_id == prompt_id).delete()
         
-        # 새로운 자동변환 텍스트 추가
-        for autotext_data in prompt_data.autotexts:
+        # 새로운 자동변환 텍스트 추가 (첫 번째 것만 사용)
+        if len(prompt_data.autotexts) > 0:
+            autotext_data = prompt_data.autotexts[0]
             # 중복 체크 (다른 프롬프트에서 사용 중인지)
             existing = db.query(AutoText).filter(
                 AutoText.trigger_text == autotext_data.trigger_text

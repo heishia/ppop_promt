@@ -16,6 +16,11 @@ let backendProcess;
 autoUpdater.autoDownload = false; // 자동 다운로드 비활성화 (사용자 확인 후 다운로드)
 autoUpdater.autoInstallOnAppQuit = true; // 앱 종료 시 자동 설치
 
+// GitHub API 호출을 위한 헤더 설정 (406 에러 방지)
+autoUpdater.requestHeaders = {
+    'Accept': 'application/vnd.github.v3+json, application/vnd.github.v3.raw+json, application/json, */*'
+};
+
 // 개발 모드에서는 업데이트 체크 비활성화
 if (app.isPackaged) {
     // 프로덕션 환경에서만 업데이트 체크
@@ -254,8 +259,18 @@ autoUpdater.on('update-not-available', (info) => {
 
 autoUpdater.on('error', (err) => {
     console.error('업데이트 오류:', err);
+    console.error('에러 상세 정보:', {
+        message: err.message,
+        stack: err.stack,
+        code: err.code,
+        statusCode: err.statusCode
+    });
     if (mainWindow) {
-        mainWindow.webContents.send('update-error', { message: err.message });
+        mainWindow.webContents.send('update-error', { 
+            message: err.message,
+            code: err.code,
+            statusCode: err.statusCode
+        });
     }
 });
 
