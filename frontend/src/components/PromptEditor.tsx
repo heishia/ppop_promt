@@ -22,11 +22,11 @@ interface PromptData {
   name: string;
   prompt: string;
   autoTexts: AutoText[];
-  folderId?: string;
+  folderId?: number;
 }
 
 interface FolderType {
-  id: string;
+  id: number;
   name: string;
 }
 
@@ -38,14 +38,14 @@ interface PromptEditorProps {
     name: string;
     prompt: string;
     autoTexts: AutoText[];
-    folderId?: string;
+    folderId?: number;
   }) => void;
 }
 
 export function PromptEditor({ promptData, folders, onSave }: PromptEditorProps) {
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [folderId, setFolderId] = useState<string>("none");
+  const [folderId, setFolderId] = useState<number | "none">("none");
   const [autoTextInput, setAutoTextInput] = useState("");
   const [autoText, setAutoText] = useState<AutoText | null>(null);
 
@@ -98,7 +98,7 @@ export function PromptEditor({ promptData, folders, onSave }: PromptEditorProps)
 
     // 자동변환 텍스트는 하나만 허용
     const autoTexts = autoText ? [autoText] : [];
-    onSave({ name, prompt, autoTexts, folderId: folderId === "none" ? undefined : folderId });
+    onSave({ name, prompt, autoTexts, folderId: folderId === "none" ? undefined : folderId as number });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -133,8 +133,8 @@ export function PromptEditor({ promptData, folders, onSave }: PromptEditorProps)
               className="bg-input-background border-border flex-1"
             />
             <Select
-              value={folderId}
-              onValueChange={(value: string) => setFolderId(value === "none" ? "none" : value)}
+              value={folderId.toString()}
+              onValueChange={(value: string) => setFolderId(value === "none" ? "none" : parseInt(value))}
             >
               <SelectTrigger className="w-[200px] bg-input-background border-border">
                 <SelectValue placeholder="폴더 선택" />

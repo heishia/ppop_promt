@@ -6,17 +6,18 @@ import { InfoPage } from "./components/InfoPage";
 import { toast } from "sonner";
 import { Toaster } from "./components/ui/sonner";
 import { GripVertical } from "lucide-react";
+import * as api from "./services/api";
 
 interface Prompt {
   id: string;
   name: string;
   prompt: string;
   autoTexts: Array<{ shortcut: string; text: string }>;
-  folderId?: string;
+  folderId?: number;
 }
 
 interface FolderType {
-  id: string;
+  id: number;
   name: string;
 }
 
@@ -25,28 +26,61 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'welcome' | 'editor' | 'info'>('welcome');
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
-  const [folders, setFolders] = useState<FolderType[]>([
-    { id: "1", name: "작업용 프롬프트" },
-    { id: "2", name: "자주 사용" },
-  ]);
-  const [prompts, setPrompts] = useState<Prompt[]>([
-    { id: "p1", name: "이메일 작성", prompt: "이메일을 작성해주세요.", autoTexts: [], folderId: "1" },
-    { id: "p2", name: "회의 노트 정리", prompt: "회의 내용을 정리해주세요.", autoTexts: [], folderId: "1" },
-    { id: "p3", name: "코드 리뷰", prompt: "코드를 리뷰해주세요.", autoTexts: [], folderId: "2" },
-    { id: "p4", name: "번역 요청", prompt: "다음 내용을 번역해주세요.", autoTexts: [], folderId: undefined },
-  ]);
+  const [folders, setFolders] = useState<FolderType[]>([]);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 초기 데이터 로드
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // 폴더 목록 로드
+      const foldersData = await api.getFolders();
+      setFolders(foldersData.map(f => ({
+        id: f.id,
+        name: f.name
+      })));
+      
+      // 프롬프트 목록 로드
+      const promptsData = await api.getPrompts();
+      setPrompts(promptsData.map(p => ({
+        id: p.id,
+        name: p.title,
+        prompt: p.text,
+        autoTexts: p.autotexts.map(at => ({ shortcut: at.trigger_text, text: p.text })),
+        folderId: p.folder_id || undefined
+      })));
+      
+    } catch (error) {
+      console.error('데이터 로드 실패:', error);
+      toast.error('데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSelectPrompt = (id: string) => {
     setSelectedPromptId(id);
     setCurrentView('editor');
   };
 
-  const handleDeletePrompt = (id: string) => {
-    setPrompts(prompts.filter(p => p.id !== id));
-    toast.success("삭제 완료");
-    if (selectedPromptId === id) {
-      setSelectedPromptId(undefined);
-      setCurrentView('welcome');
+  const handleDeletePrompt = async (id: string) => {
+    try {
+      await api.deletePrompt(id);
+      setPrompts(prompts.filter(p => p.id !== id));
+      toast.success("삭제 완료");
+      if (selectedPromptId === id) {
+        setSelectedPromptId(undefined);
+        setCurrentView('welcome');
+      }
+    } catch (error) {
+      console.error('프롬프트 삭제 실패:', error);
+      toast.error('프롬프트 삭제에 실패했습니다.');
     }
   };
 
@@ -56,59 +90,119 @@ export default function App() {
     toast.success("새 프롬프트 작성 가능");
   };
 
-  const handleSavePrompt = (data: {
+  const handleSavePrompt = async (data: {
     name: string;
     prompt: string;
     autoTexts: Array<{ shortcut: string; text: string }>;
-    folderId?: string;
+    folderId?: number;
   }) => {
-    if (selectedPromptId) {
-      // 기존 프롬프트 수정
-      setPrompts(prompts.map(p => 
-        p.id === selectedPromptId 
-          ? { ...p, ...data }
-          : p
-      ));
-      toast.success("수정 완료");
-    } else {
-      // 새 프롬프트 생성
-      const newPrompt: Prompt = {
-        id: `p-${Date.now()}`,
-        ...data,
-      };
-      setPrompts([...prompts, newPrompt]);
-      setSelectedPromptId(newPrompt.id);
-      setCurrentView('editor');
-      toast.success("저장 완료");
+    try {
+      const autotext = data.autoTexts.length > 0 ? data.autoTexts[0].shortcut : undefined;
+      
+      if (selectedPromptId) {
+        // 기존 프롬프트 수정
+        const updated = await api.updatePrompt(selectedPromptId, {
+          title: data.name,
+          text: data.prompt,
+          autotext: autotext,
+          folder_id: data.folderId || null,
+          remove_autotext: !autotext
+        });
+        
+        setPrompts(prompts.map(p => 
+          p.id === selectedPromptId 
+            ? {
+                id: updated.id,
+                name: updated.title,
+                prompt: updated.text,
+                autoTexts: updated.autotexts.map(at => ({ shortcut: at.trigger_text, text: updated.text })),
+                folderId: updated.folder_id || undefined
+              }
+            : p
+        ));
+        toast.success("수정 완료");
+      } else {
+        // 새 프롬프트 생성
+        const created = await api.createPrompt({
+          title: data.name,
+          text: data.prompt,
+          autotext: autotext,
+          folder_id: data.folderId || null
+        });
+        
+        const newPrompt: Prompt = {
+          id: created.id,
+          name: created.title,
+          prompt: created.text,
+          autoTexts: created.autotexts.map(at => ({ shortcut: at.trigger_text, text: created.text })),
+          folderId: created.folder_id || undefined
+        };
+        
+        setPrompts([...prompts, newPrompt]);
+        setSelectedPromptId(newPrompt.id);
+        setCurrentView('editor');
+        toast.success("저장 완료");
+      }
+    } catch (error: any) {
+      console.error('프롬프트 저장 실패:', error);
+      toast.error(error.message || '프롬프트 저장에 실패했습니다.');
     }
   };
 
-  const handleAddFolder = (folderName: string) => {
-    const newFolder: FolderType = {
-      id: `f-${Date.now()}`,
-      name: folderName,
-    };
-    setFolders([...folders, newFolder]);
+  const handleAddFolder = async (folderName: string) => {
+    try {
+      const created = await api.createFolder({ name: folderName });
+      const newFolder: FolderType = {
+        id: created.id,
+        name: created.name,
+      };
+      setFolders([...folders, newFolder]);
+    } catch (error) {
+      console.error('폴더 생성 실패:', error);
+      toast.error('폴더 생성에 실패했습니다.');
+    }
   };
 
-  const handleUpdateFolder = (folderId: string, name: string) => {
-    setFolders(folders.map(f => 
-      f.id === folderId ? { ...f, name } : f
-    ));
+  const handleUpdateFolder = async (folderId: number, name: string) => {
+    try {
+      await api.updateFolder(folderId, { name });
+      setFolders(folders.map(f => 
+        f.id === folderId ? { ...f, name } : f
+      ));
+    } catch (error) {
+      console.error('폴더 수정 실패:', error);
+      toast.error('폴더 수정에 실패했습니다.');
+    }
   };
 
-  const handleDeleteFolder = (folderId: string) => {
-    // 폴더와 함께 폴더 안의 프롬프트들도 모두 삭제
-    setPrompts(prompts.filter(p => p.folderId !== folderId));
-    setFolders(folders.filter(f => f.id !== folderId));
-    toast.success("삭제 완료");
+  const handleDeleteFolder = async (folderId: number) => {
+    try {
+      await api.deleteFolder(folderId);
+      // 폴더 삭제 시 해당 폴더의 프롬프트들은 folder_id가 null로 설정됨
+      setFolders(folders.filter(f => f.id !== folderId));
+      // 프롬프트 목록 다시 로드
+      await loadData();
+      toast.success("삭제 완료");
+    } catch (error) {
+      console.error('폴더 삭제 실패:', error);
+      toast.error('폴더 삭제에 실패했습니다.');
+    }
   };
 
-  const handleMovePrompt = (promptId: string, targetFolderId?: string) => {
-    setPrompts(prompts.map(p => 
-      p.id === promptId ? { ...p, folderId: targetFolderId } : p
-    ));
-    toast.success("이동 완료");
+  const handleMovePrompt = async (promptId: string, targetFolderId?: number) => {
+    try {
+      await api.updatePrompt(promptId, {
+        folder_id: targetFolderId || null
+      });
+      
+      setPrompts(prompts.map(p => 
+        p.id === promptId ? { ...p, folderId: targetFolderId } : p
+      ));
+      toast.success("이동 완료");
+    } catch (error) {
+      console.error('프롬프트 이동 실패:', error);
+      toast.error('프롬프트 이동에 실패했습니다.');
+    }
   };
 
   const handleMouseDown = () => {
@@ -150,6 +244,16 @@ export default function App() {
   };
 
   const renderMainContent = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="text-lg text-muted-foreground">로딩 중...</div>
+          </div>
+        </div>
+      );
+    }
+    
     if (currentView === 'info') {
       return <InfoPage onBack={handleBackToWelcome} />;
     }

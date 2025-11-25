@@ -7,6 +7,22 @@ import os
 from typing import List
 
 
+def get_data_dir():
+    """
+    APPDATA 폴더 경로 반환
+    
+    Returns:
+        str: APPDATA/blueme 경로
+    """
+    if os.name == 'nt':  # Windows
+        appdata_dir = os.path.join(os.environ.get('APPDATA', ''), 'blueme')
+    else:  # macOS, Linux
+        appdata_dir = os.path.join(os.path.expanduser('~'), '.blueme')
+    
+    os.makedirs(appdata_dir, exist_ok=True)
+    return appdata_dir
+
+
 class BaseConfig:
     """기본 설정 클래스"""
     
@@ -14,6 +30,11 @@ class BaseConfig:
     APP_NAME: str = "Blueme API"
     APP_DESCRIPTION: str = "Blueme 프롬프트 관리 API"
     APP_VERSION: str = "1.0.0"
+    
+    # 데이터 파일 경로
+    DATA_DIR: str = get_data_dir()
+    PROMPTS_FILE: str = os.path.join(DATA_DIR, 'prompts.json')
+    FOLDERS_FILE: str = os.path.join(DATA_DIR, 'folders.json')
     
     # CORS 설정
     CORS_ORIGINS: List[str] = [
@@ -24,8 +45,25 @@ class BaseConfig:
     CORS_METHODS: List[str] = ["*"]
     CORS_HEADERS: List[str] = ["*"]
     
-    # 데이터베이스 설정
-    DB_ECHO: bool = False  # SQLAlchemy 쿼리 로깅
+    @staticmethod
+    def _get_cors_origins_with_port_range(base_origins: List[str], start_port: int = 8000, end_port: int = 8010) -> List[str]:
+        """
+        CORS origins에 포트 범위를 추가합니다.
+        
+        Args:
+            base_origins: 기본 CORS origins 리스트
+            start_port: 시작 포트 번호
+            end_port: 끝 포트 번호
+        
+        Returns:
+            List[str]: 포트 범위가 추가된 CORS origins 리스트
+        """
+        origins = base_origins.copy()
+        # localhost의 포트 범위 추가 (8000-8010)
+        for port in range(start_port, end_port + 1):
+            origins.append(f"http://localhost:{port}")
+            origins.append(f"http://127.0.0.1:{port}")
+        return origins
 
 
 class DevelopmentConfig(BaseConfig):
@@ -33,11 +71,18 @@ class DevelopmentConfig(BaseConfig):
     
     # 서버 설정
     HOST: str = "127.0.0.1"
-    PORT: int = 8000
     RELOAD: bool = True
     
-    # 데이터베이스
-    DB_ECHO: bool = True  # 개발 환경에서는 쿼리 로깅 활성화
+    @property
+    def PORT(self) -> int:
+        """포트 번호 (환경 변수에서 동적으로 읽기)"""
+        return int(os.getenv("BACKEND_PORT", "8000"))
+    
+    # CORS 설정 - 포트 범위(8000-8010) 포함하여 동적 포트 전환 지원
+    CORS_ORIGINS: List[str] = BaseConfig._get_cors_origins_with_port_range([
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ])
 
 
 class ProductionConfig(BaseConfig):
@@ -45,15 +90,18 @@ class ProductionConfig(BaseConfig):
     
     # 서버 설정
     HOST: str = "127.0.0.1"  # 일렉트론에서는 로컬호스트만 사용
-    PORT: int = 8000
     RELOAD: bool = False
     
-    # CORS 설정 - 일렉트론에서는 file:// 프로토콜 허용
-    CORS_ORIGINS: List[str] = [
+    @property
+    def PORT(self) -> int:
+        """포트 번호 (환경 변수에서 동적으로 읽기)"""
+        return int(os.getenv("BACKEND_PORT", "8000"))
+    
+    # CORS 설정 - 포트 범위(8000-8010) 포함하여 동적 포트 전환 지원
+    CORS_ORIGINS: List[str] = BaseConfig._get_cors_origins_with_port_range([
         "http://localhost:3000",
         "http://localhost:5173",
-        "http://localhost:8000",
-    ]
+    ])
 
 
 def get_config() -> BaseConfig:
@@ -79,4 +127,3 @@ def get_config() -> BaseConfig:
 
 # 전역 설정 객체
 config = get_config()
-

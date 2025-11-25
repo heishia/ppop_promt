@@ -7,11 +7,11 @@ import { Input } from "./ui/input";
 interface Prompt {
   id: string;
   name: string;
-  folderId?: string;
+  folderId?: number;
 }
 
 interface FolderType {
-  id: string;
+  id: number;
   name: string;
 }
 
@@ -23,9 +23,9 @@ interface PromptSidebarProps {
   folders: FolderType[];
   prompts: Prompt[];
   onAddFolder: (name: string) => void;
-  onUpdateFolder: (folderId: string, name: string) => void;
-  onDeleteFolder: (folderId: string) => void;
-  onMovePrompt: (promptId: string, targetFolderId?: string) => void;
+  onUpdateFolder: (folderId: number, name: string) => void;
+  onDeleteFolder: (folderId: number) => void;
+  onMovePrompt: (promptId: string, targetFolderId?: number) => void;
 }
 
 export function PromptSidebar({
@@ -40,14 +40,14 @@ export function PromptSidebar({
   onDeleteFolder,
   onMovePrompt,
 }: PromptSidebarProps) {
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["1", "2"]));
+  const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
-  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
   const [editingFolderName, setEditingFolderName] = useState("");
   const [draggedPromptId, setDraggedPromptId] = useState<string | null>(null);
-  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<number | string | null>(null);
 
-  const toggleFolder = (folderId: string) => {
+  const toggleFolder = (folderId: number) => {
     const newExpanded = new Set(expandedFolders);
     if (newExpanded.has(folderId)) {
       newExpanded.delete(folderId);
@@ -66,7 +66,7 @@ export function PromptSidebar({
     setEditingFolderName(folder.name);
   };
 
-  const handleFolderNameSubmit = (folderId: string) => {
+  const handleFolderNameSubmit = (folderId: number) => {
     if (editingFolderName.trim()) {
       onUpdateFolder(folderId, editingFolderName.trim());
     }
@@ -74,7 +74,7 @@ export function PromptSidebar({
     setEditingFolderName("");
   };
 
-  const handleFolderNameKeyDown = (e: React.KeyboardEvent, folderId: string) => {
+  const handleFolderNameKeyDown = (e: React.KeyboardEvent, folderId: number) => {
     if (e.key === "Enter") {
       handleFolderNameSubmit(folderId);
     } else if (e.key === "Escape") {
@@ -83,7 +83,7 @@ export function PromptSidebar({
     }
   };
 
-  const getPromptsInFolder = (folderId?: string) => {
+  const getPromptsInFolder = (folderId?: number) => {
     return prompts.filter((p) => p.folderId === folderId);
   };
 
@@ -106,7 +106,7 @@ export function PromptSidebar({
     setDragOverFolderId(null);
   };
 
-  const handleDragOver = (e: React.DragEvent, folderId?: string) => {
+  const handleDragOver = (e: React.DragEvent, folderId?: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverFolderId(folderId || 'uncategorized');
@@ -116,7 +116,7 @@ export function PromptSidebar({
     setDragOverFolderId(null);
   };
 
-  const handleDrop = (e: React.DragEvent, targetFolderId?: string) => {
+  const handleDrop = (e: React.DragEvent, targetFolderId?: number) => {
     e.preventDefault();
     if (draggedPromptId) {
       onMovePrompt(draggedPromptId, targetFolderId);

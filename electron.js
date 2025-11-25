@@ -3,7 +3,7 @@
  * 
  * ppop_promt 데스크탑 애플리케이션의 메인 프로세스입니다.
  */
-const { app, BrowserWindow, screen, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, dialog, shell, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -11,6 +11,9 @@ const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
 let backendProcess;
+let tray = null;
+let isQuitting = false;
+let backendPort = 8000; // 기본 포트, 동적으로 업데이트됨
 
 // 자동 업데이트 설정
 autoUpdater.autoDownload = false; // 자동 다운로드 비활성화 (사용자 확인 후 다운로드)
@@ -31,30 +34,92 @@ if (app.isPackaged) {
 function startBackend() {
     const isDev = !app.isPackaged;
     
-    if (isDev) {
-        console.log('개발 모드: 백엔드 서버를 수동으로 시작하세요 (python run.py)');
+    // 이미 백엔드 프로세스가 실행 중이면 재시작하지 않음
+    if (backendProcess && !backendProcess.killed) {
+        console.log('백엔드 프로세스가 이미 실행 중입니다.');
         return;
     }
     
-    // 프로덕션 환경에서 백엔드 실행 (PyInstaller로 빌드된 exe)
-    const backendExe = path.join(process.resourcesPath, 'ppop_promt_backend.exe');
-    
-    console.log(`백엔드 실행: ${backendExe}`);
-    
-    backendProcess = spawn(backendExe, ['prod'], {
-        env: { ...process.env, ENV: 'production' }
-    });
+    if (isDev) {
+        // 개발 모드: Python 백엔드 실행
+        // 가상환경이 있으면 우선 사용, 없으면 시스템 Python 사용
+        let pythonPath;
+        const venvPython = process.platform === 'win32' 
+            ? path.join(__dirname, 'venv', 'Scripts', 'python.exe')
+            : path.join(__dirname, 'venv', 'bin', 'python');
+        
+        if (fs.existsSync(venvPython)) {
+            pythonPath = venvPython;
+            console.log('가상환경 Python 사용:', pythonPath);
+        } else {
+            pythonPath = process.platform === 'win32' ? 'python' : 'python3';
+            console.log('시스템 Python 사용:', pythonPath);
+        }
+        
+        const runPyPath = path.join(__dirname, 'run.py');
+        
+        console.log(`개발 모드: 백엔드 서버 시작 (${pythonPath} ${runPyPath} prod)`);
+        
+        backendProcess = spawn(pythonPath, [runPyPath, 'prod'], {
+            cwd: __dirname,
+            env: { ...process.env, ENV: 'production' },
+            shell: true  // Windows에서 경로 문제 해결
+        });
+    } else {
+        // 프로덕션 환경에서 백엔드 실행 (PyInstaller로 빌드된 exe)
+        const backendExe = path.join(process.resourcesPath, 'ppop_promt_backend.exe');
+        
+        console.log(`백엔드 실행: ${backendExe}`);
+        
+        backendProcess = spawn(backendExe, ['prod'], {
+            env: { ...process.env, ENV: 'production' }
+        });
+    }
     
     backendProcess.stdout.on('data', (data) => {
-        console.log(`Backend: ${data}`);
+        const output = data.toString();
+        console.log(`Backend: ${output}`);
+        
+        // 포트 정보 파싱
+        // 예: "Address: http://127.0.0.1:8001"
+        const portMatch = output.match(/Address:\s*http:\/\/[^:]+:(\d+)/);
+        if (portMatch) {
+            backendPort = parseInt(portMatch[1], 10);
+            console.log(`백엔드 포트 감지: ${backendPort}`);
+        }
+        
+        // 포트 충돌 에러 감지
+        if (output.includes('error while attempting to bind') || 
+            output.includes('각 소켓 주소') ||
+            output.includes('Address already in use')) {
+            console.warn('포트 충돌 감지됨. 백엔드가 다른 포트를 시도할 수 있습니다.');
+        }
     });
     
     backendProcess.stderr.on('data', (data) => {
-        console.error(`Backend Error: ${data}`);
+        const errorOutput = data.toString();
+        console.error(`Backend Error: ${errorOutput}`);
+        
+        // 포트 충돌 에러 감지
+        if (errorOutput.includes('error while attempting to bind') || 
+            errorOutput.includes('각 소켓 주소') ||
+            errorOutput.includes('Address already in use')) {
+            console.warn('⚠️  포트 충돌이 감지되었습니다. 백엔드가 자동으로 다른 포트를 찾습니다.');
+        }
     });
     
     backendProcess.on('error', (error) => {
         console.error(`백엔드 시작 실패: ${error}`);
+    });
+    
+    backendProcess.on('exit', (code, signal) => {
+        console.log(`Backend process exited: code ${code}, signal ${signal}`);
+        backendProcess = null;
+        
+        // 자동 재시작 제거 - 사용자가 수동으로 재시작하거나 앱을 재시작해야 함
+        if (!isQuitting && code !== 0) {
+            console.error('Backend process exited unexpectedly. Please restart the app.');
+        }
     });
 }
 
@@ -96,7 +161,17 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js'),
         },
         autoHideMenuBar: true,  // 메뉴바 자동 숨김
-        title: 'ppop_promt'
+        title: 'ppop_promt',
+        show: true,  // 창을 즉시 표시
+        backgroundColor: '#ffffff'  // 로딩 중 배경색
+    });
+    
+    // 창이 준비되면 표시
+    mainWindow.once('ready-to-show', () => {
+        if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+        }
     });
     
     // 개발 환경과 프로덕션 환경 분기
@@ -104,7 +179,12 @@ function createWindow() {
     
     if (isDev) {
         // 개발 환경: Vite 개발 서버
-        mainWindow.loadURL('http://localhost:5173');
+        console.log('개발 모드: Vite 개발 서버에 연결 시도 (http://localhost:5173)');
+        mainWindow.loadURL('http://localhost:5173').catch((error) => {
+            console.error('프론트엔드 로드 실패:', error);
+            const errorMsg = `프론트엔드 개발 서버에 연결할 수 없습니다.\n\n프론트엔드 개발 서버를 먼저 실행해주세요:\ncd frontend && npm run dev\n\n오류: ${error.message}`;
+            dialog.showErrorBox('프론트엔드 서버 연결 실패', errorMsg);
+        });
         mainWindow.webContents.openDevTools();  // 개발자 도구 열기
     } else {
         // 프로덕션 환경: 빌드된 파일
@@ -155,6 +235,24 @@ function createWindow() {
             }
         });
     }
+    
+    // 창 닫기 이벤트 처리 (트레이로 숨김)
+    mainWindow.on('close', (event) => {
+        if (!isQuitting) {
+            event.preventDefault();
+            mainWindow.hide();
+            
+            // Windows에서 트레이 아이콘 클릭 시 창 표시
+            if (process.platform === 'win32') {
+                if (tray) {
+                    tray.displayBalloon({
+                        title: 'ppop_promt',
+                        content: '앱이 백그라운드에서 실행 중입니다. 트레이 아이콘을 클릭하여 다시 열 수 있습니다.'
+                    });
+                }
+            }
+        }
+    });
     
     mainWindow.on('closed', () => {
         mainWindow = null;
@@ -310,6 +408,98 @@ autoUpdater.on('update-downloaded', (info) => {
     });
 });
 
+// 시스템 트레이 생성
+function createTray() {
+    try {
+        const iconPath = path.join(__dirname, 'public', 'logo.ico');
+        const pngPath = path.join(__dirname, 'public', 'logo.png');
+        
+        // 아이콘 파일 찾기
+        let trayIcon;
+        if (fs.existsSync(iconPath)) {
+            trayIcon = iconPath;
+        } else if (fs.existsSync(pngPath)) {
+            trayIcon = pngPath;
+        } else {
+            console.warn('트레이 아이콘을 찾을 수 없습니다. 기본 아이콘을 사용합니다.');
+            // 기본 아이콘 사용 (없으면 Electron 기본 아이콘)
+            trayIcon = undefined;
+        }
+        
+        if (trayIcon) {
+            tray = new Tray(trayIcon);
+        } else {
+            // 아이콘이 없어도 트레이 생성 시도 (기본 아이콘 사용)
+            console.warn('트레이 아이콘이 없습니다. 기본 아이콘을 사용합니다.');
+            return; // 아이콘이 없으면 트레이 생성을 건너뜀
+        }
+        
+        tray.setToolTip('ppop_promt');
+    
+    const contextMenu = Menu.buildFromTemplate([
+        {
+            label: '창 표시',
+            click: () => {
+                if (mainWindow) {
+                    mainWindow.show();
+                    mainWindow.focus();
+                } else {
+                    createWindow();
+                }
+            }
+        },
+        {
+            label: '창 숨김',
+            click: () => {
+                if (mainWindow) {
+                    mainWindow.hide();
+                }
+            }
+        },
+        { type: 'separator' },
+        {
+            label: '종료',
+            click: () => {
+                isQuitting = true;
+                if (backendProcess) {
+                    backendProcess.kill();
+                }
+                app.quit();
+            }
+        }
+    ]);
+    
+        tray.setContextMenu(contextMenu);
+        
+        // 트레이 아이콘 클릭 시 창 토글
+        tray.on('click', () => {
+            if (mainWindow) {
+                if (mainWindow.isVisible()) {
+                    mainWindow.hide();
+                } else {
+                    mainWindow.show();
+                    mainWindow.focus();
+                }
+            } else {
+                createWindow();
+            }
+        });
+        
+        // 더블 클릭 시 창 표시
+        tray.on('double-click', () => {
+            if (mainWindow) {
+                mainWindow.show();
+                mainWindow.focus();
+            } else {
+                createWindow();
+            }
+        });
+    } catch (error) {
+        console.error('트레이 생성 실패:', error);
+        // 트레이 생성 실패해도 앱은 계속 실행
+    }
+}
+
 // 앱 아이콘 설정 (Windows에서 라운딩 자동 적용)
 if (process.platform === 'win32') {
     // Windows에서 앱 아이콘 설정
@@ -318,29 +508,97 @@ if (process.platform === 'win32') {
 
 // 앱 준비 완료
 app.whenReady().then(() => {
-    startBackend();
+    console.log('Electron 앱 시작 중...');
     
-    // 백엔드 서버가 시작될 시간을 주기 위해 약간 대기
-    setTimeout(() => {
-        createWindow();
-    }, 2000);
+    try {
+        // 시스템 트레이 생성
+        createTray();
+        console.log('시스템 트레이 생성 완료');
+    } catch (error) {
+        console.error('시스템 트레이 생성 실패:', error);
+        // 트레이 생성 실패해도 계속 진행
+    }
+    
+    // 백엔드 서버 시작
+    try {
+        startBackend();
+        console.log('백엔드 서버 시작 요청 완료');
+    } catch (error) {
+        console.error('백엔드 서버 시작 실패:', error);
+        // 백엔드 시작 실패해도 창은 열기
+    }
+    
+    // 프론트엔드 개발 서버가 시작될 때까지 대기 후 창 생성
+    // 개발 서버가 준비될 때까지 최대 10초 대기
+    let retryCount = 0;
+    const maxRetries = 20; // 20번 시도 (총 10초)
+    
+    const tryCreateWindow = () => {
+        // 프론트엔드 개발 서버 연결 확인
+        const http = require('http');
+        const checkServer = () => {
+            return new Promise((resolve) => {
+                const req = http.get('http://localhost:5173', (res) => {
+                    resolve(true);
+                });
+                req.on('error', () => {
+                    resolve(false);
+                });
+                req.setTimeout(500, () => {
+                    req.destroy();
+                    resolve(false);
+                });
+            });
+        };
+        
+        checkServer().then((isReady) => {
+            if (isReady || retryCount >= maxRetries) {
+                try {
+                    createWindow();
+                    console.log('메인 윈도우 생성 완료');
+                } catch (error) {
+                    console.error('메인 윈도우 생성 실패:', error);
+                    dialog.showErrorBox('앱 시작 오류', `앱을 시작하는 중 오류가 발생했습니다:\n${error.message}`);
+                }
+            } else {
+                retryCount++;
+                console.log(`프론트엔드 서버 대기 중... (${retryCount}/${maxRetries})`);
+                setTimeout(tryCreateWindow, 500);
+            }
+        });
+    };
+    
+    // 즉시 시도 시작
+    tryCreateWindow();
     
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             createWindow();
+        } else if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
         }
     });
+}).catch((error) => {
+    console.error('앱 시작 중 치명적 오류:', error);
+    dialog.showErrorBox('앱 시작 오류', `앱을 시작할 수 없습니다:\n${error.message}`);
 });
 
-// 모든 윈도우가 닫히면
+// 모든 윈도우가 닫히면 (macOS 제외)
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
+    // macOS가 아닌 경우 창을 닫아도 앱이 계속 실행되도록 함 (트레이로 이동)
+    // macOS는 기본 동작 유지
+    if (process.platform === 'darwin') {
+        // macOS는 기본 동작
+    } else {
+        // Windows/Linux: 창을 닫아도 앱은 계속 실행 (트레이에 있음)
+        // app.quit()을 호출하지 않음
     }
 });
 
 // 앱 종료 시 백엔드 프로세스도 종료
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+    isQuitting = true;
     if (backendProcess) {
         backendProcess.kill();
     }

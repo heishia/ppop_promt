@@ -7,7 +7,7 @@
   "author": "ppop_promt",
   "license": "MIT",
   "scripts": {
-    "dev": "electron .",
+    "dev": "node_modules\\.bin\\electron.cmd .",
     "clean": "node clean.js",
     "build:backend": "python backend/build_backend.py",
     "build:frontend": "cd frontend && npm run build",

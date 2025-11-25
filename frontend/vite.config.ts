@@ -56,7 +56,8 @@
       outDir: 'dist',
     },
     server: {
-      port: 3000,
-      open: true,
+      port: 5173,
+      open: false, // Electron 앱에서 사용하므로 브라우저 자동 열기 비활성화
+      strictPort: false, // 포트가 사용 중이면 다른 포트 사용
     },
   });

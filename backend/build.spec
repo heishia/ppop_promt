@@ -3,6 +3,7 @@
 PyInstaller 빌드 설정 파일
 
 백엔드 FastAPI 서버를 독립 실행 파일로 빌드합니다.
+JSON 파일 기반 저장소로 변경됨.
 """
 
 block_cipher = None
@@ -28,6 +29,8 @@ a = Analysis(
         'backend.routers.prompts',
         'backend.routers.folders',
         'backend.routers.autotext',
+        'backend.storage',
+        'backend.services.autotext_watcher',
     ],
     hookspath=[],
     hooksconfig={},
@@ -37,6 +40,8 @@ a = Analysis(
         'MySQLdb',        # MySQL 드라이버 (사용 안 함)
         'psycopg2',       # PostgreSQL 드라이버 (사용 안 함)
         'tzdata',         # 타임존 데이터 (SQLite 기본 포함)
+        'PyQt6',          # PyQt6 (사용 안 함)
+        'sqlalchemy',     # SQLAlchemy (사용 안 함)
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -68,4 +73,3 @@ exe = EXE(
     entitlements_file=None,
     icon='../public/logo.ico'
 )
-

@@ -2,6 +2,7 @@
 자동변환 텍스트 감지 서비스
 
 키보드 입력을 감지하여 자동변환 텍스트를 처리하는 백그라운드 서비스입니다.
+blueme의 GlobalAutoTextWatcher 로직을 기반으로 합니다.
 """
 import keyboard
 import pyperclip
@@ -9,6 +10,7 @@ import threading
 import time
 import requests
 from typing import Dict
+
 
 class AutoTextWatcher:
     """
@@ -18,40 +20,40 @@ class AutoTextWatcher:
     해당하는 프롬프트 텍스트로 자동 변환합니다.
     """
     
-    def __init__(self, api_url: str = "http://127.0.0.1:8000"):
+    def __init__(self, api_url: str = "http://127.0.0.1:8000", debug: bool = False):
         """
         AutoTextWatcher 초기화
         
         Args:
             api_url: FastAPI 서버 URL
+            debug: 디버그 모드 활성화 여부
         """
         self.api_url = api_url
         self.autotext_dict: Dict[str, str] = {}
+        self.previous_dict: Dict[str, str] = {}  # 이전 딕셔너리 저장 (변경 감지용)
         self.typed = ""
         self.running = False
         self.lock = threading.Lock()
         self.thread: threading.Thread = None
-        self.update_interval = 5  # 5초마다 딕셔너리 업데이트
+        self.debug = debug  # 디버그 모드
     
     def start(self):
         """자동변환 감지 서비스 시작"""
         if self.running:
-            print("자동변환 텍스트 감지 서비스가 이미 실행 중입니다.")
+            print("[WARNING] 자동변환 텍스트 감지 서비스가 이미 실행 중입니다.")
             return
         
         self.running = True
-        self.update_dict_from_api()
-        print(f"자동변환 텍스트 딕셔너리 로드 완료: {len(self.autotext_dict)}개 트리거")
+        
+        # 딕셔너리 초기 로드
+        print("[INFO] 자동변환 텍스트 딕셔너리 로드 중...")
+        self.update_dict_from_api(is_initial=True)
         
         # 백그라운드 스레드 시작
         self.thread = threading.Thread(target=self._watch, daemon=True)
         self.thread.start()
-        print("키보드 감지 스레드 시작 완료")
-        
-        # 주기적으로 딕셔너리 업데이트하는 스레드
-        update_thread = threading.Thread(target=self._periodic_update, daemon=True)
-        update_thread.start()
-        print("딕셔너리 업데이트 스레드 시작 완료")
+        print("[INFO] 키보드 감지 스레드 시작 완료")
+        print("[INFO] 딕셔너리는 프롬프트 저장/수정/삭제 시에만 업데이트됩니다.")
     
     def stop(self):
         """자동변환 감지 서비스 중지"""
@@ -59,29 +61,128 @@ class AutoTextWatcher:
         if self.thread:
             self.thread.join(timeout=1)
     
-    def update_dict_from_api(self):
-        """API에서 자동변환 텍스트 딕셔너리 업데이트"""
-        try:
-            response = requests.get(f"{self.api_url}/api/autotexts/dict", timeout=2)
-            if response.status_code == 200:
-                with self.lock:
-                    self.autotext_dict = response.json()
-                    print(f"자동변환 텍스트 딕셔너리 업데이트 완료: {len(self.autotext_dict)}개 트리거")
-            else:
-                print(f"자동변환 텍스트 딕셔너리 업데이트 실패: HTTP {response.status_code}")
-        except requests.exceptions.ConnectionError:
-            print(f"자동변환 텍스트 딕셔너리 업데이트 실패: API 서버에 연결할 수 없습니다 ({self.api_url})")
-        except Exception as e:
-            print(f"자동변환 텍스트 딕셔너리 업데이트 실패: {e}")
+    def _compare_dicts(self, old_dict: Dict[str, str], new_dict: Dict[str, str]) -> dict:
+        """
+        두 딕셔너리를 비교하여 변경사항을 반환합니다.
+        
+        Args:
+            old_dict: 이전 딕셔너리
+            new_dict: 새로운 딕셔너리
+        
+        Returns:
+            dict: 변경사항 정보 (added, removed, modified, unchanged)
+        """
+        old_keys = set(old_dict.keys())
+        new_keys = set(new_dict.keys())
+        
+        added = new_keys - old_keys
+        removed = old_keys - new_keys
+        common = old_keys & new_keys
+        
+        modified = {k for k in common if old_dict[k] != new_dict[k]}
+        unchanged = common - modified
+        
+        return {
+            'added': added,
+            'removed': removed,
+            'modified': modified,
+            'unchanged': unchanged,
+            'total_old': len(old_dict),
+            'total_new': len(new_dict)
+        }
     
-    def _periodic_update(self):
-        """주기적으로 딕셔너리 업데이트"""
-        while self.running:
-            time.sleep(self.update_interval)
-            self.update_dict_from_api()
+    def update_dict_from_api(self, is_initial: bool = False):
+        """
+        API에서 자동변환 텍스트 딕셔너리 업데이트
+        
+        Args:
+            is_initial: 초기 로드 여부 (항상 로그 출력)
+        """
+        max_retries = 5
+        retry_delay = 1
+        
+        print(f"[DEBUG] 딕셔너리 업데이트 시작: {self.api_url}/api/autotexts/dict")
+        
+        for attempt in range(max_retries):
+            try:
+                start_time = time.time()
+                response = requests.get(f"{self.api_url}/api/autotexts/dict", timeout=3)
+                elapsed_time = (time.time() - start_time) * 1000  # 밀리초
+                
+                if response.status_code == 200:
+                    new_dict = response.json()
+                    
+                    with self.lock:
+                        # 이전 딕셔너리와 비교
+                        changes = self._compare_dicts(self.previous_dict, new_dict)
+                        
+                        # 딕셔너리 업데이트
+                        self.previous_dict = self.autotext_dict.copy()
+                        self.autotext_dict = new_dict
+                        
+                        # 변경사항이 있거나 초기 로드인 경우에만 로그 출력
+                        has_changes = (len(changes['added']) > 0 or 
+                                     len(changes['removed']) > 0 or 
+                                     len(changes['modified']) > 0)
+                        
+                        if is_initial or has_changes:
+                            print(f"✅ 자동변환 텍스트 딕셔너리 업데이트 완료: {len(new_dict)}개 트리거 (응답 시간: {elapsed_time:.1f}ms)")
+                            
+                            if has_changes and not is_initial:
+                                # 변경사항 상세 출력
+                                if changes['added']:
+                                    print(f"   ➕ 추가됨: {list(changes['added'])}")
+                                if changes['removed']:
+                                    print(f"   ➖ 제거됨: {list(changes['removed'])}")
+                                if changes['modified']:
+                                    print(f"   🔄 수정됨: {list(changes['modified'])}")
+                            
+                            if len(new_dict) > 0:
+                                print(f"   트리거 목록: {list(new_dict.keys())}")
+                            elif is_initial:
+                                print("   ⚠️  경고: 자동변환 텍스트 딕셔너리가 비어있습니다.")
+                        else:
+                            # 변경사항이 없어도 간단히 로그 출력 (디버그 모드에서만 상세 정보)
+                            if self.debug:
+                                print(f"[DEBUG] 딕셔너리 업데이트 완료 (변경사항 없음): {len(new_dict)}개 트리거 (응답 시간: {elapsed_time:.1f}ms)")
+                            else:
+                                print(f"[DEBUG] 딕셔너리 확인 완료: {len(new_dict)}개 트리거 (변경사항 없음)")
+                    
+                    return
+                else:
+                    print(f"[ERROR] 자동변환 텍스트 딕셔너리 업데이트 실패: HTTP {response.status_code}")
+            except requests.exceptions.ConnectionError:
+                if attempt < max_retries - 1:
+                    if is_initial or self.debug:
+                        print(f"[WARNING] API 서버에 연결할 수 없습니다. {retry_delay}초 후 재시도... ({attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # 지수 백오프
+                else:
+                    print(f"[ERROR] 자동변환 텍스트 딕셔너리 업데이트 실패: API 서버에 연결할 수 없습니다 ({self.api_url})")
+            except Exception as e:
+                print(f"[ERROR] 자동변환 텍스트 딕셔너리 업데이트 실패: {e}")
+                if self.debug:
+                    import traceback
+                    print(f"[ERROR] 상세 오류:\n{traceback.format_exc()}")
+                break
+    
+    def trigger_update(self):
+        """
+        딕셔너리 업데이트를 수동으로 트리거합니다.
+        프롬프트가 저장/수정/삭제될 때 호출됩니다.
+        """
+        if not self.running:
+            print("[DEBUG] watcher가 실행 중이 아니므로 업데이트를 건너뜁니다.")
+            return
+        
+        print("[DEBUG] 딕셔너리 업데이트 트리거됨 (프롬프트 변경 감지)")
+        
+        # 별도 스레드에서 업데이트 실행 (블로킹 방지)
+        update_thread = threading.Thread(target=self.update_dict_from_api, args=(False,), daemon=True)
+        update_thread.start()
     
     def _watch(self):
-        """키보드 입력 감지 및 처리"""
+        """키보드 입력 감지 및 처리 (blueme의 GlobalAutoTextWatcher 로직 기반)"""
         def on_key(e):
             if not self.running:
                 return
@@ -130,25 +231,34 @@ class AutoTextWatcher:
         try:
             print("키보드 후크 등록 중...")
             keyboard.hook(on_key)
-            print("키보드 후크 등록 완료. 키보드 입력 감지 시작.")
+            print("✅ 키보드 후크 등록 완료. 키보드 입력 감지 시작.")
+            print("💡 다른 애플리케이션에서 트리거 텍스트를 입력하면 자동으로 변환됩니다.")
             keyboard.wait()
+        except PermissionError as ex:
+            print(f"❌ 키보드 후크 등록 실패: 권한 오류")
+            print(f"   오류 상세: {ex}")
+            print("⚠️  Windows에서 키보드 후크를 사용하려면 관리자 권한으로 실행해야 합니다.")
+            print("   Electron 앱을 관리자 권한으로 실행해주세요.")
         except Exception as ex:
-            print(f"키보드 후크 등록 실패: {ex}")
-            print("참고: Windows에서 키보드 후크를 사용하려면 관리자 권한이 필요할 수 있습니다.")
+            print(f"❌ 키보드 후크 등록 실패: {ex}")
+            print("⚠️  참고: Windows에서 키보드 후크를 사용하려면 관리자 권한이 필요할 수 있습니다.")
 
-def start_autotext_watcher(api_url: str = "http://127.0.0.1:8000"):
+
+def start_autotext_watcher(api_url: str = "http://127.0.0.1:8000", debug: bool = False):
     """
     자동변환 텍스트 감지 서비스 시작 함수
     
     Args:
         api_url: FastAPI 서버 URL
+        debug: 디버그 모드 활성화 여부
     
     Returns:
         AutoTextWatcher: 생성된 watcher 인스턴스
     """
-    watcher = AutoTextWatcher(api_url)
+    watcher = AutoTextWatcher(api_url, debug=debug)
     watcher.start()
     return watcher
+
 
 if __name__ == "__main__":
     # 독립 실행 시 테스트
