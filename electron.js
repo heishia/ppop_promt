@@ -24,6 +24,29 @@ autoUpdater.requestHeaders = {
     'Accept': 'application/vnd.github.v3+json, application/vnd.github.v3.raw+json, application/json, */*'
 };
 
+// 단일 인스턴스 실행 강제 (중복 실행 방지)
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    // 이미 다른 인스턴스가 실행 중이면 종료
+    console.log('Another instance is already running. Quitting...');
+    app.quit();
+} else {
+    // 두 번째 인스턴스가 실행되려고 할 때 기존 창을 표시
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+        console.log('Second instance detected. Focusing main window...');
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) {
+                mainWindow.restore();
+            }
+            if (!mainWindow.isVisible()) {
+                mainWindow.show();
+            }
+            mainWindow.focus();
+        }
+    });
+}
+
 // 개발 모드에서는 업데이트 체크 비활성화
 if (app.isPackaged) {
     // 프로덕션 환경에서만 업데이트 체크
@@ -245,21 +268,12 @@ function createWindow() {
         });
     }
     
-    // 창 닫기 이벤트 처리 (트레이로 숨김)
+    // 창 닫기 이벤트 처리 (완전 종료)
     mainWindow.on('close', (event) => {
-        if (!isQuitting) {
-            event.preventDefault();
-            mainWindow.hide();
-            
-            // Windows에서 트레이 아이콘 클릭 시 창 표시
-            if (process.platform === 'win32') {
-                if (tray) {
-                    tray.displayBalloon({
-                        title: 'ppop_promt',
-                        content: '앱이 백그라운드에서 실행 중입니다. 트레이 아이콘을 클릭하여 다시 열 수 있습니다.'
-                    });
-                }
-            }
+        // 창 닫기 버튼(X)을 누르면 백엔드까지 완전 종료
+        isQuitting = true;
+        if (backendProcess) {
+            backendProcess.kill();
         }
     });
     
