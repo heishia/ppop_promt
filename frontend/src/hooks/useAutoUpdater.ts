@@ -1,28 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
 
-// Electron API 타입 정의
-interface ElectronAPI {
-  checkForUpdates: () => Promise<{ updateAvailable?: boolean; version?: string; error?: string }>;
-  downloadUpdate: () => Promise<{ success?: boolean; error?: string }>;
-  quitAndInstall: () => Promise<void>;
-  onUpdateChecking: (callback: () => void) => () => void;
-  onUpdateAvailable: (callback: (data: { version: string; releaseDate?: string; releaseNotes?: string }) => void) => () => void;
-  onUpdateNotAvailable: (callback: () => void) => () => void;
-  onUpdateError: (callback: (data: { message: string }) => void) => () => void;
-  onUpdateDownloadProgress: (callback: (data: { percent: number; transferred: number; total: number }) => void) => () => void;
-  onUpdateDownloaded: (callback: (data: { version: string }) => void) => () => void;
-  shell?: {
-    openExternal: (url: string) => Promise<{ success?: boolean; error?: string }>;
-  };
-  getVersion?: () => Promise<string>;
-}
-
-declare global {
-  interface Window {
-    electronAPI?: ElectronAPI;
-  }
-}
-
 interface UpdateStatus {
   checking: boolean;
   available: boolean;
@@ -46,7 +23,7 @@ export function useAutoUpdater() {
 
   const checkForUpdates = useCallback(async () => {
     if (!window.electronAPI) {
-      setStatus(prev => ({ ...prev, error: 'Electron 환경이 아닙니다.' }));
+      setStatus(prev => ({ ...prev, error: 'Electron environment not available.' }));
       return;
     }
 
@@ -55,7 +32,9 @@ export function useAutoUpdater() {
       const result = await window.electronAPI.checkForUpdates();
       
       if (result.error) {
-        setStatus(prev => ({ ...prev, checking: false, error: result.error || null }));
+        // GitHub 관련 에러는 조용히 처리 (개발 모드 또는 네트워크 문제)
+        console.warn('Update check failed:', result.error);
+        setStatus(prev => ({ ...prev, checking: false, error: null }));
       } else {
         setStatus(prev => ({
           ...prev,
@@ -65,10 +44,12 @@ export function useAutoUpdater() {
         }));
       }
     } catch (error) {
+      // 업데이트 체크 실패는 치명적이지 않으므로 조용히 처리
+      console.warn('Update check exception:', error);
       setStatus(prev => ({
         ...prev,
         checking: false,
-        error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.',
+        error: null, // 사용자에게 에러 표시하지 않음
       }));
     }
   }, []);
@@ -139,11 +120,13 @@ export function useAutoUpdater() {
     });
 
     const cleanupError = window.electronAPI.onUpdateError((data) => {
+      // GitHub 관련 에러는 조용히 로깅만
+      console.warn('Auto-updater error:', data.message);
       setStatus(prev => ({
         ...prev,
         checking: false,
         downloading: false,
-        error: data.message,
+        error: null, // 사용자에게는 에러 표시하지 않음
       }));
     });
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
-import { X, Mail, Bug, ExternalLink, Download, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { X, Mail, Bug, ExternalLink, Download, RefreshCw, CheckCircle2, AlertCircle, Info as InfoIcon } from "lucide-react";
 import { useAutoUpdater } from "../hooks/useAutoUpdater";
 import { toast } from "sonner";
 
@@ -13,18 +13,50 @@ interface InfoPageProps {
 export function InfoPage({ onBack }: InfoPageProps) {
   const [showEmailButtons, setShowEmailButtons] = useState<'feedback' | 'bug' | null>(null);
   const [appVersion, setAppVersion] = useState<string>('1.0.0');
+  const [logoError, setLogoError] = useState(false);
+  const [logoSrc, setLogoSrc] = useState<string>('/logo.png');
   
   const { status, checkForUpdates, downloadUpdate, installUpdate } = useAutoUpdater();
 
-  // 컴포넌트 마운트 시 업데이트 체크 및 버전 정보 가져오기 (Electron 환경에서만)
+  // Logo image loading with fallbacks
+  useEffect(() => {
+    const tryLoadImage = async () => {
+      try {
+        const img = new Image();
+        img.src = '/logo.png';
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        setLogoSrc('/logo.png');
+      } catch {
+        try {
+          const img = new Image();
+          img.src = '../public/logo.png';
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+          setLogoSrc('../public/logo.png');
+        } catch {
+          console.warn('Logo image not found in InfoPage');
+          setLogoError(true);
+        }
+      }
+    };
+
+    tryLoadImage();
+  }, []);
+
+  // Update check and version info (Electron only)
   useEffect(() => {
     if (window.electronAPI) {
       checkForUpdates();
-      // 앱 버전 정보 가져오기
+      // Get app version
       window.electronAPI.getVersion?.().then((version: string) => {
         setAppVersion(version);
       }).catch(() => {
-        // 버전 정보를 가져올 수 없는 경우 기본값 사용
+        // Use default if version not available
         setAppVersion('1.0.0');
       });
     }
@@ -121,14 +153,24 @@ export function InfoPage({ onBack }: InfoPageProps) {
 
       <div className="flex-1 overflow-auto px-6 py-4 flex items-center justify-center">
         <div className="w-full max-w-2xl space-y-6 flex flex-col items-center">
-          {/* 로고 */}
+          {/* Logo */}
           <div className="flex justify-center pt-4 pb-2">
-            <img
-              src="/logo.png"
-              alt="PPOP Prompt Logo"
-              className="object-contain rounded-lg"
-              style={{ width: '48px', height: '48px' }}
-            />
+            {!logoError ? (
+              <img
+                src={logoSrc}
+                alt="PPOP Prompt Logo"
+                className="object-contain rounded-lg"
+                style={{ width: '48px', height: '48px' }}
+                onError={() => {
+                  console.warn('Logo image failed to load in InfoPage');
+                  setLogoError(true);
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center w-[48px] h-[48px] bg-primary/10 rounded-lg">
+                <InfoIcon className="w-6 h-6 text-primary" />
+              </div>
+            )}
           </div>
 
           {/* 피드백 보내기 */}

@@ -1,22 +1,22 @@
 /**
- * Electron API 타입 정의
+ * Electron API Type Definitions
  */
 
 interface ElectronAPI {
-  checkForUpdates: () => Promise<any>;
-  downloadUpdate: () => Promise<any>;
-  quitAndInstall: () => Promise<any>;
+  checkForUpdates: () => Promise<{ updateAvailable?: boolean; version?: string; error?: string }>;
+  downloadUpdate: () => Promise<{ success?: boolean; error?: string }>;
+  quitAndInstall: () => Promise<void>;
   onUpdateChecking: (callback: () => void) => () => void;
-  onUpdateAvailable: (callback: (data: any) => void) => () => void;
+  onUpdateAvailable: (callback: (data: { version: string; releaseDate?: string; releaseNotes?: string }) => void) => () => void;
   onUpdateNotAvailable: (callback: () => void) => () => void;
-  onUpdateError: (callback: (data: any) => void) => () => void;
-  onUpdateDownloadProgress: (callback: (data: any) => void) => () => void;
-  onUpdateDownloaded: (callback: (data: any) => void) => () => void;
-  shell: {
-    openExternal: (url: string) => Promise<void>;
+  onUpdateError: (callback: (data: { message: string; code?: string; statusCode?: number }) => void) => () => void;
+  onUpdateDownloadProgress: (callback: (data: { percent: number; transferred: number; total: number }) => void) => () => void;
+  onUpdateDownloaded: (callback: (data: { version: string }) => void) => () => void;
+  shell?: {
+    openExternal: (url: string) => Promise<{ success?: boolean; error?: string }>;
   };
-  getVersion: () => Promise<string>;
-  getBackendPort: () => Promise<number>;
+  getVersion?: () => Promise<string>;
+  getBackendPort?: () => Promise<number>;
 }
 
 interface Window {
