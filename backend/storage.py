@@ -65,24 +65,24 @@ def _generate_id() -> str:
 
 # ============== 프롬프트 관련 함수 ==============
 
-def get_prompts(folder_id: Optional[int] = None, prompt_type: Optional[str] = None) -> List[Dict]:
+def get_prompts(folder_id: Optional[int] = None) -> List[Dict]:
     """
     프롬프트 목록 조회
     
     Args:
         folder_id: 폴더 ID로 필터링 (선택사항)
-        prompt_type: 프롬프트 타입으로 필터링 (선택사항)
     
     Returns:
         List[Dict]: 프롬프트 목록
     """
     prompts = _read_json_file(config.PROMPTS_FILE)
     
+    # 기존 데이터의 type 필드 제거 (하위 호환성)
+    for prompt in prompts:
+        prompt.pop('type', None)
+    
     if folder_id is not None:
         prompts = [p for p in prompts if p.get('folder_id') == folder_id]
-    
-    if prompt_type:
-        prompts = [p for p in prompts if p.get('type') == prompt_type]
     
     return prompts
 
@@ -101,19 +101,20 @@ def get_prompt_by_id(prompt_id: str) -> Optional[Dict]:
     
     for prompt in prompts:
         if prompt.get('id') == prompt_id:
+            # 기존 데이터의 type 필드 제거 (하위 호환성)
+            prompt.pop('type', None)
             return prompt
     
     return None
 
 
-def create_prompt(title: str, prompt_type: str, text: str, 
+def create_prompt(title: str, text: str, 
                  autotext: Optional[str] = None, folder_id: Optional[int] = None) -> Dict:
     """
     프롬프트 생성
     
     Args:
         title: 프롬프트 제목
-        prompt_type: 프롬프트 타입 (GPT, Cursor 등)
         text: 프롬프트 내용
         autotext: 자동변환 텍스트 (선택사항)
         folder_id: 폴더 ID (선택사항)
@@ -135,7 +136,6 @@ def create_prompt(title: str, prompt_type: str, text: str,
     new_prompt = {
         'id': prompt_id,
         'title': title,
-        'type': prompt_type,
         'text': text,
         'folder_id': folder_id,
         'created_at': now,
@@ -152,7 +152,7 @@ def create_prompt(title: str, prompt_type: str, text: str,
 
 
 def update_prompt(prompt_id: str, title: Optional[str] = None, 
-                 prompt_type: Optional[str] = None, text: Optional[str] = None,
+                 text: Optional[str] = None,
                  autotext: Optional[str] = None, folder_id: Optional[int] = None,
                  remove_autotext: bool = False) -> Optional[Dict]:
     """
@@ -161,7 +161,6 @@ def update_prompt(prompt_id: str, title: Optional[str] = None,
     Args:
         prompt_id: 프롬프트 ID
         title: 프롬프트 제목 (선택사항)
-        prompt_type: 프롬프트 타입 (선택사항)
         text: 프롬프트 내용 (선택사항)
         autotext: 자동변환 텍스트 (선택사항)
         folder_id: 폴더 ID (선택사항)
@@ -182,8 +181,6 @@ def update_prompt(prompt_id: str, title: Optional[str] = None,
         if prompt.get('id') == prompt_id:
             if title is not None:
                 prompt['title'] = title
-            if prompt_type is not None:
-                prompt['type'] = prompt_type
             if text is not None:
                 prompt['text'] = text
             if folder_id is not None:

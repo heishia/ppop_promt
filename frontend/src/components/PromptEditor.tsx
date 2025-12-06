@@ -3,7 +3,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
-import { Save } from "lucide-react";
+import { Save, X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,16 +13,15 @@ import {
 } from "./ui/select";
 
 interface AutoText {
-  shortcut: string;
-  text: string;
+  trigger_text: string;
 }
 
 interface PromptData {
   id: string;
-  name: string;
-  prompt: string;
-  autoTexts: AutoText[];
-  folderId?: number;
+  title: string;
+  text: string;
+  autotexts: AutoText[];
+  folder_id?: number | null;
 }
 
 interface FolderType {
@@ -35,77 +34,53 @@ interface PromptEditorProps {
   promptData?: PromptData;
   folders: FolderType[];
   onSave: (data: {
-    name: string;
-    prompt: string;
-    autoTexts: AutoText[];
-    folderId?: number;
+    title: string;
+    text: string;
+    autotexts: AutoText[];
+    folder_id?: number | null;
   }) => void;
+  onExit?: () => void;
 }
 
-export function PromptEditor({ promptData, folders, onSave }: PromptEditorProps) {
-  const [name, setName] = useState("");
-  const [prompt, setPrompt] = useState("");
+export function PromptEditor({ promptData, folders, onSave, onExit }: PromptEditorProps) {
+  const [title, setTitle] = useState("");
+  const [text, setText] = useState("");
   const [folderId, setFolderId] = useState<number | "none">("none");
   const [autoTextInput, setAutoTextInput] = useState("");
-  const [autoText, setAutoText] = useState<AutoText | null>(null);
 
   // 선택된 프롬프트 데이터를 로드
   useEffect(() => {
     if (promptData) {
-      setName(promptData.name);
-      setPrompt(promptData.prompt);
-      setFolderId(promptData.folderId || "none");
+      setTitle(promptData.title);
+      setText(promptData.text);
+      setFolderId(promptData.folder_id || "none");
       // 자동변환 텍스트는 첫 번째 것만 사용 (하나만 허용)
-      setAutoText(promptData.autoTexts && promptData.autoTexts.length > 0 ? promptData.autoTexts[0] : null);
+      setAutoTextInput(promptData.autotexts && promptData.autotexts.length > 0 ? promptData.autotexts[0].trigger_text : "");
     } else {
       // 새 프롬프트
-      setName("");
-      setPrompt("");
+      setTitle("");
+      setText("");
       setFolderId("none");
-      setAutoText(null);
+      setAutoTextInput("");
     }
   }, [promptData]);
 
-  const handleSetAutoText = () => {
-    const trigger = autoTextInput.trim();
-    if (!trigger) {
-      // 빈 값이면 자동변환 텍스트 제거
-      setAutoText(null);
-      setAutoTextInput("");
-      return;
-    }
-
-    if (trigger.length < 2) {
-      alert('트리거는 최소 2자 이상이어야 합니다.');
-      return;
-    }
-
-    // 자동변환 텍스트는 하나만 허용
-    setAutoText({ shortcut: trigger, text: prompt });
-    setAutoTextInput("");
-  };
-
-  const handleRemoveAutoText = () => {
-    setAutoText(null);
-    setAutoTextInput("");
-  };
-
   const handleSave = () => {
-    if (!name.trim() || !prompt.trim()) {
+    if (!title.trim() || !text.trim()) {
       alert("프롬프트 이름과 내용을 입력해주세요.");
       return;
     }
 
-    // 자동변환 텍스트는 하나만 허용
-    const autoTexts = autoText ? [autoText] : [];
-    onSave({ name, prompt, autoTexts, folderId: folderId === "none" ? undefined : folderId as number });
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSetAutoText();
+    // 자동변환 텍스트 검증
+    const trigger = autoTextInput.trim();
+    if (trigger && trigger.length < 2) {
+      alert('자동변환 텍스트는 최소 2자 이상이어야 합니다.');
+      return;
     }
+
+    // 자동변환 텍스트가 있으면 배열에 추가
+    const autotexts = trigger ? [{ trigger_text: trigger }] : [];
+    onSave({ title, text, autotexts, folder_id: folderId === "none" ? undefined : folderId as number });
   };
 
   return (
@@ -117,6 +92,10 @@ export function PromptEditor({ promptData, folders, onSave }: PromptEditorProps)
             <Save className="w-4 h-4 mr-2" />
             저장
           </Button>
+          <Button onClick={onExit} size="sm" variant="outline">
+            <X className="w-4 h-4 mr-2" />
+            나가기
+          </Button>
         </div>
       </div>
 
@@ -127,8 +106,8 @@ export function PromptEditor({ promptData, folders, onSave }: PromptEditorProps)
           <div className="flex gap-2">
             <Input
               id="prompt-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               placeholder="프롬프트 이름을 입력하세요"
               className="bg-input-background border-border flex-1"
             />
@@ -142,7 +121,7 @@ export function PromptEditor({ promptData, folders, onSave }: PromptEditorProps)
               <SelectContent>
                 <SelectItem value="none">폴더 없음</SelectItem>
                 {folders.map((folder) => (
-                  <SelectItem key={folder.id} value={folder.id}>
+                  <SelectItem key={folder.id} value={folder.id.toString()}>
                     {folder.name}
                   </SelectItem>
                 ))}
@@ -156,8 +135,8 @@ export function PromptEditor({ promptData, folders, onSave }: PromptEditorProps)
           <Label htmlFor="prompt-content">프롬프트 내용</Label>
           <Textarea
             id="prompt-content"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
             placeholder="프롬프트 내용을 입력하세요"
             className="min-h-[200px] bg-input-background border-border resize-none"
           />
@@ -165,44 +144,17 @@ export function PromptEditor({ promptData, folders, onSave }: PromptEditorProps)
 
         {/* Auto Text */}
         <div className="space-y-2">
-          <Label htmlFor="auto-text">자동변환 텍스트 (하나만 허용)</Label>
-          <div className="flex gap-2">
-            <Input
-              id="auto-text"
-              value={autoTextInput || (autoText ? autoText.shortcut : "")}
-              onChange={(e) => setAutoTextInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder='트리거 입력 (예: @h1, @@, front)'
-              className="bg-input-background border-border"
-            />
-            <Button onClick={handleSetAutoText} type="button" variant="outline">
-              {autoText ? "수정" : "설정"}
-            </Button>
-            {autoText && (
-              <Button onClick={handleRemoveAutoText} type="button" variant="outline">
-                제거
-              </Button>
-            )}
-          </div>
-
-          {autoText && (
-            <div className="mt-4 space-y-2">
-              <p className="text-sm text-muted-foreground">등록된 트리거 (입력 시 프롬프트 전체가 자동 완성됩니다)</p>
-              <div className="flex flex-wrap gap-2">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm">
-                  <span>{autoText.shortcut}</span>
-                  <button
-                    onClick={handleRemoveAutoText}
-                    className="hover:bg-primary-foreground/20 rounded-sm p-0.5"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <Label htmlFor="auto-text">자동변환 텍스트 (선택사항)</Label>
+          <Input
+            id="auto-text"
+            value={autoTextInput}
+            onChange={(e) => setAutoTextInput(e.target.value)}
+            placeholder='트리거 입력 (예: @1, front, @@) - 최소 2자 이상'
+            className="bg-input-background border-border"
+          />
+          <p className="text-xs text-muted-foreground">
+            트리거를 입력하면 다른 앱에서 해당 텍스트 입력 시 프롬프트 전체가 자동 완성됩니다
+          </p>
         </div>
       </div>
     </div>

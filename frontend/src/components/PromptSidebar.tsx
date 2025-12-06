@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { Folder, Plus, ChevronRight, ChevronDown, Trash2, Search } from "lucide-react";
 import { Button } from "./ui/button";
-import { ScrollArea } from "./ui/scroll-area";
 import { Input } from "./ui/input";
 
 interface Prompt {
   id: string;
-  name: string;
-  folderId?: number;
+  title: string;
+  folder_id?: number | null;
 }
 
 interface FolderType {
@@ -46,6 +45,12 @@ export function PromptSidebar({
   const [editingFolderName, setEditingFolderName] = useState("");
   const [draggedPromptId, setDraggedPromptId] = useState<string | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<number | string | null>(null);
+  
+  // 디버그: props 변경 감지
+  console.log('[PromptSidebar] 렌더링:', { 
+    foldersCount: folders.length, 
+    promptsCount: prompts.length 
+  });
 
   const toggleFolder = (folderId: number) => {
     const newExpanded = new Set(expandedFolders);
@@ -84,11 +89,15 @@ export function PromptSidebar({
   };
 
   const getPromptsInFolder = (folderId?: number) => {
-    return prompts.filter((p) => p.folderId === folderId);
+    if (folderId === undefined) {
+      // folder_id가 null 또는 undefined인 프롬프트 (미분류)
+      return prompts.filter((p) => p.folder_id == null);
+    }
+    return prompts.filter((p) => p.folder_id === folderId);
   };
 
   const filteredPrompts = prompts.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    p.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const isPromptVisible = (prompt: Prompt) => {
@@ -109,7 +118,7 @@ export function PromptSidebar({
   const handleDragOver = (e: React.DragEvent, folderId?: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragOverFolderId(folderId || 'uncategorized');
+    setDragOverFolderId(folderId !== undefined ? folderId : 'uncategorized');
   };
 
   const handleDragLeave = () => {
@@ -126,8 +135,9 @@ export function PromptSidebar({
   };
 
   return (
-    <div className="w-full border-r border-border bg-sidebar h-full flex flex-col">
-      <div className="p-4 border-b border-sidebar-border space-y-3">
+    <div className="w-full border-r border-border bg-sidebar flex flex-col" style={{ height: '100vh' }}>
+      {/* 상단 버튼 영역 - 고정 */}
+      <div className="p-4 border-b border-sidebar-border space-y-3" style={{ flexShrink: 0 }}>
         <Button onClick={onNewPrompt} className="w-full" size="sm">
           <Plus className="w-4 h-4 mr-2" />
           새 프롬프트
@@ -143,7 +153,8 @@ export function PromptSidebar({
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      {/* 스크롤 가능한 프롬프트/폴더 목록 영역 */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
         <div className="p-2">
           {/* Folders */}
           {folders.map((folder) => (
@@ -208,7 +219,7 @@ export function PromptSidebar({
                         } ${draggedPromptId === prompt.id ? 'opacity-50' : ''}`}
                         onClick={() => onSelectPrompt(prompt.id)}
                       >
-                        <span className="flex-1 truncate">{prompt.name}</span>
+                        <span className="flex-1 truncate">{prompt.title}</span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -255,7 +266,7 @@ export function PromptSidebar({
                     } ${draggedPromptId === prompt.id ? 'opacity-50' : ''}`}
                     onClick={() => onSelectPrompt(prompt.id)}
                   >
-                    <span className="flex-1 truncate">{prompt.name}</span>
+                    <span className="flex-1 truncate">{prompt.title}</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -273,9 +284,10 @@ export function PromptSidebar({
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
-      <div className="p-3 border-t border-sidebar-border">
+      {/* 하단 폴더 생성 버튼 - 고정 */}
+      <div className="p-3 border-t border-sidebar-border" style={{ flexShrink: 0 }}>
         <Button onClick={addNewFolder} variant="ghost" size="sm" className="w-full">
           <Folder className="w-4 h-4 mr-2" />
           새 폴더

@@ -5,17 +5,37 @@
  */
 
 // API 기본 URL (동적 포트 감지)
-function getApiBaseUrl(): string {
+let API_BASE_URL = 'http://localhost:8000';
+
+// 일렉트론 환경에서 백엔드 포트 가져오기
+async function initializeApiUrl() {
   // 환경 변수에서 API URL 확인
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+    API_BASE_URL = import.meta.env.VITE_API_URL;
+    return;
   }
   
-  // 기본 포트 범위 (8000-8010)
-  return 'http://localhost:8000';
+  // 일렉트론 환경에서 백엔드 포트 가져오기
+  if (window.electronAPI && window.electronAPI.getBackendPort) {
+    try {
+      const port = await window.electronAPI.getBackendPort();
+      if (port) {
+        API_BASE_URL = `http://localhost:${port}`;
+        console.log(`일렉트론 백엔드 포트 감지: ${port}`);
+      }
+    } catch (error) {
+      console.warn('백엔드 포트 가져오기 실패, 기본 포트 사용:', error);
+    }
+  }
 }
 
-const API_BASE_URL = getApiBaseUrl();
+// 앱 시작 시 API URL 초기화
+initializeApiUrl();
+
+// 현재 API Base URL 가져오기 (최신 값 사용)
+function getApiBaseUrl(): string {
+  return API_BASE_URL;
+}
 
 // 포트 자동 감지 및 재시도 로직
 async function fetchWithPortRetry(url: string, options?: RequestInit, retries: number = 0): Promise<Response> {
@@ -31,6 +51,8 @@ async function fetchWithPortRetry(url: string, options?: RequestInit, retries: n
       if (nextPort <= 8010) {
         const newUrl = url.replace(`:${currentPort}`, `:${nextPort}`);
         console.log(`포트 ${currentPort} 연결 실패, 포트 ${nextPort} 시도 중...`);
+        // 새로운 포트로 API_BASE_URL 업데이트
+        API_BASE_URL = `http://localhost:${nextPort}`;
         return fetchWithPortRetry(newUrl, options, retries + 1);
       }
     }
@@ -47,7 +69,6 @@ export interface AutoText {
 export interface Prompt {
   id: string;
   title: string;
-  type: string;
   text: string;
   folder_id?: number | null;
   created_at: string;
@@ -57,7 +78,6 @@ export interface Prompt {
 
 export interface PromptCreate {
   title: string;
-  type?: string;
   text: string;
   autotext?: string;
   folder_id?: number | null;
@@ -65,7 +85,6 @@ export interface PromptCreate {
 
 export interface PromptUpdate {
   title?: string;
-  type?: string;
   text?: string;
   autotext?: string;
   folder_id?: number | null;
@@ -97,7 +116,7 @@ export async function getPrompts(folderId?: number, type?: string): Promise<Prom
   if (folderId !== undefined) params.append('folder_id', folderId.toString());
   if (type) params.append('type', type);
   
-  const url = `${API_BASE_URL}/api/prompts${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `${getApiBaseUrl()}/api/prompts/${params.toString() ? '?' + params.toString() : ''}`;
   const response = await fetchWithPortRetry(url);
   
   if (!response.ok) {
@@ -111,7 +130,7 @@ export async function getPrompts(folderId?: number, type?: string): Promise<Prom
  * 특정 프롬프트 조회
  */
 export async function getPrompt(id: string): Promise<Prompt> {
-  const response = await fetch(`${API_BASE_URL}/api/prompts/${id}`);
+  const response = await fetchWithPortRetry(`${getApiBaseUrl()}/api/prompts/${id}`);
   
   if (!response.ok) {
     throw new Error(`프롬프트 조회 실패: ${response.statusText}`);
@@ -124,15 +143,12 @@ export async function getPrompt(id: string): Promise<Prompt> {
  * 프롬프트 생성
  */
 export async function createPrompt(data: PromptCreate): Promise<Prompt> {
-  const response = await fetch(`${API_BASE_URL}/api/prompts`, {
+  const response = await fetchWithPortRetry(`${getApiBaseUrl()}/api/prompts/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      ...data,
-      type: data.type || 'GPT', // 기본값 GPT
-    }),
+    body: JSON.stringify(data),
   });
   
   if (!response.ok) {
@@ -147,7 +163,7 @@ export async function createPrompt(data: PromptCreate): Promise<Prompt> {
  * 프롬프트 수정
  */
 export async function updatePrompt(id: string, data: PromptUpdate): Promise<Prompt> {
-  const response = await fetch(`${API_BASE_URL}/api/prompts/${id}`, {
+  const response = await fetchWithPortRetry(`${getApiBaseUrl()}/api/prompts/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -167,7 +183,7 @@ export async function updatePrompt(id: string, data: PromptUpdate): Promise<Prom
  * 프롬프트 삭제
  */
 export async function deletePrompt(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/prompts/${id}`, {
+  const response = await fetchWithPortRetry(`${getApiBaseUrl()}/api/prompts/${id}`, {
     method: 'DELETE',
   });
   
@@ -183,7 +199,7 @@ export async function deletePrompt(id: string): Promise<void> {
  * 폴더 목록 조회
  */
 export async function getFolders(): Promise<Folder[]> {
-  const response = await fetch(`${API_BASE_URL}/api/folders`);
+  const response = await fetchWithPortRetry(`${getApiBaseUrl()}/api/folders/`);
   
   if (!response.ok) {
     throw new Error(`폴더 목록 조회 실패: ${response.statusText}`);
@@ -196,7 +212,7 @@ export async function getFolders(): Promise<Folder[]> {
  * 특정 폴더 조회
  */
 export async function getFolder(id: number): Promise<Folder> {
-  const response = await fetch(`${API_BASE_URL}/api/folders/${id}`);
+  const response = await fetchWithPortRetry(`${getApiBaseUrl()}/api/folders/${id}`);
   
   if (!response.ok) {
     throw new Error(`폴더 조회 실패: ${response.statusText}`);
@@ -209,7 +225,7 @@ export async function getFolder(id: number): Promise<Folder> {
  * 폴더 생성
  */
 export async function createFolder(data: FolderCreate): Promise<Folder> {
-  const response = await fetch(`${API_BASE_URL}/api/folders`, {
+  const response = await fetchWithPortRetry(`${getApiBaseUrl()}/api/folders/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -229,7 +245,7 @@ export async function createFolder(data: FolderCreate): Promise<Folder> {
  * 폴더 수정
  */
 export async function updateFolder(id: number, data: FolderUpdate): Promise<Folder> {
-  const response = await fetch(`${API_BASE_URL}/api/folders/${id}`, {
+  const response = await fetchWithPortRetry(`${getApiBaseUrl()}/api/folders/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -249,7 +265,7 @@ export async function updateFolder(id: number, data: FolderUpdate): Promise<Fold
  * 폴더 삭제
  */
 export async function deleteFolder(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/folders/${id}`, {
+  const response = await fetchWithPortRetry(`${getApiBaseUrl()}/api/folders/${id}`, {
     method: 'DELETE',
   });
   

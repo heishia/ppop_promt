@@ -151,9 +151,17 @@ function createWindow() {
     console.log(`화면 해상도: ${screenWidth}x${screenHeight}`);
     console.log(`창 크기: ${windowWidth}x${windowHeight}`);
     
+    // 개발 환경 확인
+    const isDev = !app.isPackaged;
+    
     mainWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
+        minWidth: isDev ? undefined : windowWidth,  // 개발 모드에서는 최소 크기 제한 없음
+        minHeight: isDev ? undefined : windowHeight,  // 개발 모드에서는 최소 크기 제한 없음
+        maxWidth: isDev ? undefined : windowWidth,  // 개발 모드에서는 최대 크기 제한 없음
+        maxHeight: isDev ? undefined : windowHeight,  // 개발 모드에서는 최대 크기 제한 없음
+        resizable: isDev ? true : false,  // 개발 모드에서만 크기 조절 가능
         icon: path.join(__dirname, 'public', 'logo.ico'),
         webPreferences: {
             nodeIntegration: false,
@@ -175,8 +183,6 @@ function createWindow() {
     });
     
     // 개발 환경과 프로덕션 환경 분기
-    const isDev = !app.isPackaged;
-    
     if (isDev) {
         // 개발 환경: Vite 개발 서버
         console.log('개발 모드: Vite 개발 서버에 연결 시도 (http://localhost:5173)');
@@ -311,6 +317,11 @@ function setupIpcHandlers() {
     // 앱 버전 정보 가져오기
     ipcMain.handle('get-app-version', () => {
         return app.getVersion();
+    });
+    
+    // 백엔드 포트 가져오기
+    ipcMain.handle('get-backend-port', () => {
+        return backendPort;
     });
 }
 

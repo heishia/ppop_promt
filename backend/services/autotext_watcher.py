@@ -2,7 +2,7 @@
 자동변환 텍스트 감지 서비스
 
 키보드 입력을 감지하여 자동변환 텍스트를 처리하는 백그라운드 서비스입니다.
-blueme의 GlobalAutoTextWatcher 로직을 기반으로 합니다.
+ppop_promt의 GlobalAutoTextWatcher 로직을 기반으로 합니다.
 """
 import keyboard
 import pyperclip
@@ -40,20 +40,18 @@ class AutoTextWatcher:
     def start(self):
         """자동변환 감지 서비스 시작"""
         if self.running:
-            print("[WARNING] 자동변환 텍스트 감지 서비스가 이미 실행 중입니다.")
+            if self.debug:
+                print("[WARNING] 자동변환 텍스트 감지 서비스가 이미 실행 중입니다.")
             return
         
         self.running = True
         
         # 딕셔너리 초기 로드
-        print("[INFO] 자동변환 텍스트 딕셔너리 로드 중...")
         self.update_dict_from_api(is_initial=True)
         
         # 백그라운드 스레드 시작
         self.thread = threading.Thread(target=self._watch, daemon=True)
         self.thread.start()
-        print("[INFO] 키보드 감지 스레드 시작 완료")
-        print("[INFO] 딕셔너리는 프롬프트 저장/수정/삭제 시에만 업데이트됩니다.")
     
     def stop(self):
         """자동변환 감지 서비스 중지"""
@@ -101,7 +99,8 @@ class AutoTextWatcher:
         max_retries = 5
         retry_delay = 1
         
-        print(f"[DEBUG] 딕셔너리 업데이트 시작: {self.api_url}/api/autotexts/dict")
+        if self.debug:
+            print(f"[DEBUG] 딕셔너리 업데이트 시작: {self.api_url}/api/autotexts/dict")
         
         for attempt in range(max_retries):
             try:
@@ -120,48 +119,39 @@ class AutoTextWatcher:
                         self.previous_dict = self.autotext_dict.copy()
                         self.autotext_dict = new_dict
                         
-                        # 변경사항이 있거나 초기 로드인 경우에만 로그 출력
-                        has_changes = (len(changes['added']) > 0 or 
-                                     len(changes['removed']) > 0 or 
-                                     len(changes['modified']) > 0)
-                        
-                        if is_initial or has_changes:
-                            print(f"✅ 자동변환 텍스트 딕셔너리 업데이트 완료: {len(new_dict)}개 트리거 (응답 시간: {elapsed_time:.1f}ms)")
+                        # 디버그 모드에서만 로그 출력
+                        if self.debug:
+                            has_changes = (len(changes['added']) > 0 or 
+                                         len(changes['removed']) > 0 or 
+                                         len(changes['modified']) > 0)
                             
-                            if has_changes and not is_initial:
-                                # 변경사항 상세 출력
-                                if changes['added']:
-                                    print(f"   ➕ 추가됨: {list(changes['added'])}")
-                                if changes['removed']:
-                                    print(f"   ➖ 제거됨: {list(changes['removed'])}")
-                                if changes['modified']:
-                                    print(f"   🔄 수정됨: {list(changes['modified'])}")
-                            
-                            if len(new_dict) > 0:
-                                print(f"   트리거 목록: {list(new_dict.keys())}")
-                            elif is_initial:
-                                print("   ⚠️  경고: 자동변환 텍스트 딕셔너리가 비어있습니다.")
-                        else:
-                            # 변경사항이 없어도 간단히 로그 출력 (디버그 모드에서만 상세 정보)
-                            if self.debug:
-                                print(f"[DEBUG] 딕셔너리 업데이트 완료 (변경사항 없음): {len(new_dict)}개 트리거 (응답 시간: {elapsed_time:.1f}ms)")
-                            else:
-                                print(f"[DEBUG] 딕셔너리 확인 완료: {len(new_dict)}개 트리거 (변경사항 없음)")
+                            if is_initial or has_changes:
+                                print(f"✅ 자동변환 텍스트 딕셔너리 업데이트 완료: {len(new_dict)}개 트리거 (응답 시간: {elapsed_time:.1f}ms)")
+                                
+                                if has_changes and not is_initial:
+                                    if changes['added']:
+                                        print(f"   ➕ 추가됨: {list(changes['added'])}")
+                                    if changes['removed']:
+                                        print(f"   ➖ 제거됨: {list(changes['removed'])}")
+                                    if changes['modified']:
+                                        print(f"   🔄 수정됨: {list(changes['modified'])}")
+                                
+                                if len(new_dict) > 0:
+                                    print(f"   트리거 목록: {list(new_dict.keys())}")
                     
                     return
                 else:
-                    print(f"[ERROR] 자동변환 텍스트 딕셔너리 업데이트 실패: HTTP {response.status_code}")
+                    if self.debug:
+                        print(f"[ERROR] 자동변환 텍스트 딕셔너리 업데이트 실패: HTTP {response.status_code}")
             except requests.exceptions.ConnectionError:
                 if attempt < max_retries - 1:
-                    if is_initial or self.debug:
+                    if self.debug:
                         print(f"[WARNING] API 서버에 연결할 수 없습니다. {retry_delay}초 후 재시도... ({attempt + 1}/{max_retries})")
                     time.sleep(retry_delay)
                     retry_delay *= 2  # 지수 백오프
-                else:
-                    print(f"[ERROR] 자동변환 텍스트 딕셔너리 업데이트 실패: API 서버에 연결할 수 없습니다 ({self.api_url})")
             except Exception as e:
-                print(f"[ERROR] 자동변환 텍스트 딕셔너리 업데이트 실패: {e}")
                 if self.debug:
+                    print(f"[ERROR] 자동변환 텍스트 딕셔너리 업데이트 실패: {e}")
                     import traceback
                     print(f"[ERROR] 상세 오류:\n{traceback.format_exc()}")
                 break
@@ -182,7 +172,7 @@ class AutoTextWatcher:
         update_thread.start()
     
     def _watch(self):
-        """키보드 입력 감지 및 처리 (blueme의 GlobalAutoTextWatcher 로직 기반)"""
+        """키보드 입력 감지 및 처리 (ppop_promt의 GlobalAutoTextWatcher 로직 기반)"""
         def on_key(e):
             if not self.running:
                 return

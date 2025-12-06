@@ -55,5 +55,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     // 앱 버전 정보 가져오기
     getVersion: () => ipcRenderer.invoke('get-app-version'),
+    
+    // 백엔드 포트 가져오기
+    getBackendPort: () => ipcRenderer.invoke('get-backend-port'),
 });
 

@@ -17,7 +17,6 @@ router = APIRouter(prefix="/api/prompts", tags=["prompts"])
 class PromptCreate(BaseModel):
     """프롬프트 생성 스키마"""
     title: str = Field(..., min_length=1, description="프롬프트 제목")
-    type: str = Field(default="GPT", description="프롬프트 종류 (GPT, Cursor 등)")
     text: str = Field(..., min_length=1, description="프롬프트 내용")
     autotext: Optional[str] = Field(None, min_length=2, description="자동변환 텍스트 (예: @front)")
     folder_id: Optional[int] = Field(None, description="폴더 ID")
@@ -26,7 +25,6 @@ class PromptCreate(BaseModel):
 class PromptUpdate(BaseModel):
     """프롬프트 업데이트 스키마"""
     title: Optional[str] = Field(None, min_length=1)
-    type: Optional[str] = Field(None, min_length=1)
     text: Optional[str] = Field(None, min_length=1)
     autotext: Optional[str] = Field(None, min_length=2)
     folder_id: Optional[int] = None
@@ -42,7 +40,6 @@ class PromptResponse(BaseModel):
     """프롬프트 응답 스키마"""
     id: str
     title: str
-    type: str
     text: str
     folder_id: Optional[int]
     created_at: str
@@ -54,20 +51,18 @@ class PromptResponse(BaseModel):
 
 @router.get("/", response_model=List[PromptResponse])
 def get_prompts(
-    folder_id: Optional[int] = Query(None, description="폴더 ID로 필터링"),
-    type: Optional[str] = Query(None, description="프롬프트 타입으로 필터링 (GPT, Cursor 등)")
+    folder_id: Optional[int] = Query(None, description="폴더 ID로 필터링")
 ):
     """
     프롬프트 목록 조회
     
     Args:
         folder_id: 폴더 ID (선택사항)
-        type: 프롬프트 타입 (선택사항)
     
     Returns:
         List[PromptResponse]: 프롬프트 목록
     """
-    prompts = storage.get_prompts(folder_id=folder_id, prompt_type=type)
+    prompts = storage.get_prompts(folder_id=folder_id)
     
     # autotexts 형식 변환
     for prompt in prompts:
@@ -118,7 +113,6 @@ def create_prompt(prompt_data: PromptCreate):
     try:
         prompt = storage.create_prompt(
             title=prompt_data.title,
-            prompt_type=prompt_data.type,
             text=prompt_data.text,
             autotext=prompt_data.autotext,
             folder_id=prompt_data.folder_id
@@ -161,7 +155,6 @@ def update_prompt(prompt_id: str, prompt_data: PromptUpdate):
         prompt = storage.update_prompt(
             prompt_id=prompt_id,
             title=prompt_data.title,
-            prompt_type=prompt_data.type,
             text=prompt_data.text,
             autotext=prompt_data.autotext,
             folder_id=prompt_data.folder_id,

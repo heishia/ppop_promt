@@ -1,6 +1,6 @@
-# Blueme - 프롬프트 관리 데스크탑 앱
+# ppop_promt - 프롬프트 관리 데스크탑 앱
 
-Blueme는 프롬프트를 저장하고 자동변환 텍스트 기능을 제공하는 Electron 데스크탑 애플리케이션입니다.
+ppop_promt는 프롬프트를 저장하고 자동변환 텍스트 기능을 제공하는 Electron 데스크탑 애플리케이션입니다.
 
 ## 주요 기능
 
@@ -54,7 +54,7 @@ ppop_promt/
 
 ```bash
 git clone <저장소 주소>
-cd blueme
+cd ppop_promt
 ```
 
 ### 2단계: 백엔드 설정
@@ -269,8 +269,8 @@ npm run build
 ### 데이터베이스 위치
 
 SQLite 데이터베이스는 다음 위치에 저장됩니다:
-- Windows: `%APPDATA%\blueme\blueme.db`
-- Linux/Mac: `~/.blueme/blueme.db`
+- Windows: `%APPDATA%\ppop_promt\ppop_promt.db`
+- Linux/Mac: `~/.ppop_promt/ppop_promt.db`
 
 ### 환경 변수
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
-import { ArrowLeft, Mail, Bug, ExternalLink, Download, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { X, Mail, Bug, ExternalLink, Download, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAutoUpdater } from "../hooks/useAutoUpdater";
 import { toast } from "sonner";
 
@@ -113,14 +113,10 @@ export function InfoPage({ onBack }: InfoPageProps) {
 
   return (
     <div className="flex-1 h-full flex flex-col bg-white">
-      <div className="border-b border-border px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button onClick={onBack} variant="ghost" size="sm">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            뒤로가기
-          </Button>
-          <h2 className="text-primary">정보</h2>
-        </div>
+      <div className="border-b border-border px-6 py-4 flex items-center justify-end">
+        <Button onClick={onBack} variant="ghost" size="icon">
+          <X className="w-4 h-4" />
+        </Button>
       </div>
 
       <div className="flex-1 overflow-auto px-6 py-4 flex items-center justify-center">

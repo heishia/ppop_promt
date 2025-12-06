@@ -10,10 +10,10 @@ import * as api from "./services/api";
 
 interface Prompt {
   id: string;
-  name: string;
-  prompt: string;
-  autoTexts: Array<{ shortcut: string; text: string }>;
-  folderId?: number;
+  title: string;
+  text: string;
+  autotexts: Array<{ trigger_text: string }>;
+  folder_id?: number | null;
 }
 
 interface FolderType {
@@ -29,10 +29,20 @@ export default function App() {
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // prompts 변경 감지 (디버깅용)
+  useEffect(() => {
+    console.log('[DEBUG] prompts state 변경됨:', prompts.length, '개');
+  }, [prompts]);
 
   // 초기 데이터 로드
   useEffect(() => {
-    loadData();
+    // 약간의 지연을 두고 데이터 로드 (백엔드 포트 감지 대기)
+    const timer = setTimeout(() => {
+      loadData();
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const loadData = async () => {
@@ -41,20 +51,19 @@ export default function App() {
       
       // 폴더 목록 로드
       const foldersData = await api.getFolders();
+      console.log('[DEBUG] 폴더 데이터 로드:', foldersData);
       setFolders(foldersData.map(f => ({
         id: f.id,
         name: f.name
       })));
+      console.log('[DEBUG] 폴더 state 설정 완료:', foldersData.length, '개');
       
       // 프롬프트 목록 로드
       const promptsData = await api.getPrompts();
-      setPrompts(promptsData.map(p => ({
-        id: p.id,
-        name: p.title,
-        prompt: p.text,
-        autoTexts: p.autotexts.map(at => ({ shortcut: at.trigger_text, text: p.text })),
-        folderId: p.folder_id || undefined
-      })));
+      console.log('[DEBUG] 프롬프트 데이터 로드:', promptsData);
+      console.log('[DEBUG] 프롬프트 개수:', promptsData.length);
+      setPrompts(promptsData);
+      console.log('[DEBUG] 프롬프트 state 설정 완료');
       
     } catch (error) {
       console.error('데이터 로드 실패:', error);
@@ -91,60 +100,73 @@ export default function App() {
   };
 
   const handleSavePrompt = async (data: {
-    name: string;
-    prompt: string;
-    autoTexts: Array<{ shortcut: string; text: string }>;
-    folderId?: number;
+    title: string;
+    text: string;
+    autotexts: Array<{ trigger_text: string }>;
+    folder_id?: number | null;
   }) => {
     try {
-      const autotext = data.autoTexts.length > 0 ? data.autoTexts[0].shortcut : undefined;
+      const autotext = data.autotexts.length > 0 ? data.autotexts[0].trigger_text : undefined;
+      
+      console.log('[DEBUG] 저장 시작:', {
+        selectedPromptId,
+        data,
+        autotext,
+        isNew: !selectedPromptId
+      });
       
       if (selectedPromptId) {
         // 기존 프롬프트 수정
+        console.log('[DEBUG] 프롬프트 수정 요청:', selectedPromptId);
         const updated = await api.updatePrompt(selectedPromptId, {
-          title: data.name,
-          text: data.prompt,
+          title: data.title,
+          text: data.text,
           autotext: autotext,
-          folder_id: data.folderId || null,
+          folder_id: data.folder_id || null,
           remove_autotext: !autotext
         });
         
+        console.log('[DEBUG] 프롬프트 수정 완료:', updated);
+        
         setPrompts(prompts.map(p => 
-          p.id === selectedPromptId 
-            ? {
-                id: updated.id,
-                name: updated.title,
-                prompt: updated.text,
-                autoTexts: updated.autotexts.map(at => ({ shortcut: at.trigger_text, text: updated.text })),
-                folderId: updated.folder_id || undefined
-              }
-            : p
+          p.id === selectedPromptId ? updated : p
         ));
         toast.success("수정 완료");
       } else {
         // 새 프롬프트 생성
-        const created = await api.createPrompt({
-          title: data.name,
-          text: data.prompt,
+        console.log('[DEBUG] 새 프롬프트 생성 요청:', {
+          title: data.title,
+          text: data.text,
           autotext: autotext,
-          folder_id: data.folderId || null
+          folder_id: data.folder_id || null
         });
         
-        const newPrompt: Prompt = {
-          id: created.id,
-          name: created.title,
-          prompt: created.text,
-          autoTexts: created.autotexts.map(at => ({ shortcut: at.trigger_text, text: created.text })),
-          folderId: created.folder_id || undefined
-        };
+        const created = await api.createPrompt({
+          title: data.title,
+          text: data.text,
+          autotext: autotext,
+          folder_id: data.folder_id || null
+        });
         
-        setPrompts([...prompts, newPrompt]);
-        setSelectedPromptId(newPrompt.id);
+        console.log('[DEBUG] 프롬프트 생성 완료:', created);
+        console.log('[DEBUG] 현재 prompts 배열:', prompts);
+        console.log('[DEBUG] 새로운 prompts 배열:', [...prompts, created]);
+        
+        setPrompts(prevPrompts => {
+          const newPrompts = [...prevPrompts, created];
+          console.log('[DEBUG] setPrompts 호출 완료, 새 배열 크기:', newPrompts.length);
+          return newPrompts;
+        });
+        setSelectedPromptId(created.id);
         setCurrentView('editor');
         toast.success("저장 완료");
       }
     } catch (error: any) {
-      console.error('프롬프트 저장 실패:', error);
+      console.error('[ERROR] 프롬프트 저장 실패:', error);
+      console.error('[ERROR] Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
       toast.error(error.message || '프롬프트 저장에 실패했습니다.');
     }
   };
@@ -196,7 +218,7 @@ export default function App() {
       });
       
       setPrompts(prompts.map(p => 
-        p.id === promptId ? { ...p, folderId: targetFolderId } : p
+        p.id === promptId ? { ...p, folder_id: targetFolderId } : p
       ));
       toast.success("이동 완료");
     } catch (error) {
@@ -264,7 +286,8 @@ export default function App() {
           promptId={selectedPromptId} 
           promptData={selectedPrompt}
           folders={folders}
-          onSave={handleSavePrompt} 
+          onSave={handleSavePrompt}
+          onExit={handleBackToWelcome}
         />
       );
     }

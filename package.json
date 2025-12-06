@@ -2,7 +2,7 @@
   "name": "ppop_promt",
   "productName": "ppop_promt",
   "version": "1.0.0",
-  "description": "Blueme 프롬프트 관리 데스크탑 애플리케이션",
+  "description": "ppop_promt 프롬프트 관리 데스크탑 애플리케이션",
   "main": "electron.js",
   "author": "ppop_promt",
   "license": "MIT",

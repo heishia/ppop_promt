@@ -12,12 +12,12 @@ def get_data_dir():
     APPDATA 폴더 경로 반환
     
     Returns:
-        str: APPDATA/blueme 경로
+        str: APPDATA/ppop_promt 경로
     """
     if os.name == 'nt':  # Windows
-        appdata_dir = os.path.join(os.environ.get('APPDATA', ''), 'blueme')
+        appdata_dir = os.path.join(os.environ.get('APPDATA', ''), 'ppop_promt')
     else:  # macOS, Linux
-        appdata_dir = os.path.join(os.path.expanduser('~'), '.blueme')
+        appdata_dir = os.path.join(os.path.expanduser('~'), '.ppop_promt')
     
     os.makedirs(appdata_dir, exist_ok=True)
     return appdata_dir
@@ -27,8 +27,8 @@ class BaseConfig:
     """기본 설정 클래스"""
     
     # 앱 기본 정보
-    APP_NAME: str = "Blueme API"
-    APP_DESCRIPTION: str = "Blueme 프롬프트 관리 API"
+    APP_NAME: str = "ppop_promt API"
+    APP_DESCRIPTION: str = "ppop_promt 프롬프트 관리 API"
     APP_VERSION: str = "1.0.0"
     
     # 데이터 파일 경로
