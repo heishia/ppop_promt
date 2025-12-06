@@ -129,27 +129,32 @@ function createWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
     
-    // 기준 해상도: 1920x1080에서 950x600
-    const baseScreenWidth = 1920;
-    const baseScreenHeight = 1080;
-    const baseWindowWidth = 950;
-    const baseWindowHeight = 600;
+    // 6:4 비율 계산 (1.5 비율)
+    const aspectRatio = 1.5; // 6:4 = 1.5:1
     
-    // 해상도 비율에 따른 창 크기 계산
-    const widthRatio = baseWindowWidth / baseScreenWidth;
-    const heightRatio = baseWindowHeight / baseScreenHeight;
+    // 화면의 50%를 기본 너비로 사용
+    let windowWidth = Math.round(screenWidth * 0.5);
+    let windowHeight = Math.round(windowWidth / aspectRatio);
     
-    let windowWidth = Math.round(screenWidth * widthRatio);
-    let windowHeight = Math.round(screenHeight * heightRatio);
+    // 화면 높이를 초과하면 높이 기준으로 재계산
+    if (windowHeight > screenHeight * 0.9) {
+        windowHeight = Math.round(screenHeight * 0.9);
+        windowWidth = Math.round(windowHeight * aspectRatio);
+    }
     
-    // 최대 크기 제한 (화면의 90%)
-    const maxWidth = Math.round(screenWidth * 0.9);
-    const maxHeight = Math.round(screenHeight * 0.9);
-    windowWidth = Math.min(windowWidth, maxWidth);
-    windowHeight = Math.min(windowHeight, maxHeight);
+    // 최소 크기 설정 (UI가 깨지지 않는 선)
+    const minWidth = 800;
+    const minHeight = Math.round(minWidth / aspectRatio); // 533px
     
-    console.log(`화면 해상도: ${screenWidth}x${screenHeight}`);
-    console.log(`창 크기: ${windowWidth}x${windowHeight}`);
+    // 계산된 크기가 최소 크기보다 작으면 최소 크기 사용
+    if (windowWidth < minWidth) {
+        windowWidth = minWidth;
+        windowHeight = minHeight;
+    }
+    
+    console.log(`Screen resolution: ${screenWidth}x${screenHeight}`);
+    console.log(`Window size: ${windowWidth}x${windowHeight} (6:4 ratio)`);
+    console.log(`Minimum size: ${minWidth}x${minHeight}`);
     
     // 개발 환경 확인
     const isDev = !app.isPackaged;
@@ -157,21 +162,19 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
-        minWidth: isDev ? undefined : windowWidth,  // 개발 모드에서는 최소 크기 제한 없음
-        minHeight: isDev ? undefined : windowHeight,  // 개발 모드에서는 최소 크기 제한 없음
-        maxWidth: isDev ? undefined : windowWidth,  // 개발 모드에서는 최대 크기 제한 없음
-        maxHeight: isDev ? undefined : windowHeight,  // 개발 모드에서는 최대 크기 제한 없음
-        resizable: isDev ? true : false,  // 개발 모드에서만 크기 조절 가능
+        minWidth: isDev ? undefined : minWidth,  // Production: enforce minimum size
+        minHeight: isDev ? undefined : minHeight,  // Production: enforce minimum size
+        resizable: true,  // Allow resizing in both dev and production
         icon: path.join(__dirname, 'public', 'logo.ico'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
         },
-        autoHideMenuBar: true,  // 메뉴바 자동 숨김
+        autoHideMenuBar: true,  // Hide menu bar
         title: 'ppop_promt',
-        show: true,  // 창을 즉시 표시
-        backgroundColor: '#ffffff'  // 로딩 중 배경색
+        show: true,  // Show window immediately
+        backgroundColor: '#ffffff'  // Loading background color
     });
     
     // 창이 준비되면 표시

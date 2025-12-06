@@ -150,38 +150,61 @@ npm run dev
 
 ### 빌드 전 준비사항
 
-1. **GitHub Token 설정**
-   
-   `.env` 파일을 생성하고 GitHub Personal Access Token을 설정하세요:
-   
-   ```env
-   GH_TOKEN=your_github_token_here
-   ```
-   
-   GitHub Token 생성 방법:
-   - GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - `repo` 권한 체크 후 생성
-   - `.env.example` 파일을 참고하세요
+#### 1. 코드 서명 인증서 생성
 
-2. **버전 업데이트**
-   
-   `package.json`의 `version` 필드를 업데이트하세요:
-   ```json
-   "version": "1.0.1"
-   ```
+Windows Defender 경고를 줄이기 위해 코드 서명 인증서가 필요합니다.
+
+**자체 서명 인증서 생성 (테스트용):**
+
+관리자 권한으로 PowerShell에서 실행:
+```powershell
+.\create-certificate.ps1
+```
+
+이 스크립트는 `certificate.pfx` 파일을 생성하고 기본 비밀번호는 `ppop_promt_cert_password_2025`입니다.
+
+**주의**: 자체 서명 인증서는 Windows SmartScreen 경고를 완전히 제거하지 못합니다. 실제 배포 시에는 DigiCert, Sectigo 등에서 상업용 EV 코드 서명 인증서를 구매하세요.
+
+#### 2. GitHub Token 설정
+
+`.env` 파일을 생성하고 GitHub Personal Access Token을 설정하세요:
+
+```env
+# Code Signing
+CSC_KEY_PASSWORD=ppop_promt_cert_password_2025
+
+# GitHub Token for auto-update
+GH_TOKEN=your_github_token_here
+```
+
+GitHub Token 생성 방법:
+- GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+- `repo` 권한 체크 후 생성
+- `.env.template` 파일을 참고하세요
+
+#### 3. 버전 업데이트
+
+`package.json`의 `version` 필드를 업데이트하세요:
+```json
+"version": "1.0.1"
+```
 
 ### 빌드 명령어
 
 ```bash
-# 전체 빌드 (백엔드 + 프론트엔드 + Electron)
+# 전체 빌드 및 GitHub Release 업로드
 npm run build
+
+# 로컬 빌드만 (GitHub 업로드 없이)
+npm run build:local
 ```
 
-이 명령어는 다음을 순차적으로 실행합니다:
+**전체 빌드 프로세스:**
 1. **기존 빌드 결과물 삭제** (`clean`)
 2. **백엔드 빌드** → `resources/ppop_promt_backend.exe`
 3. **프론트엔드 빌드** → `frontend/dist/`
-4. **Electron 빌드 및 GitHub Release 업로드** → `dist/`
+4. **Electron 빌드 및 코드 서명** → `dist/`
+5. **GitHub Release 자동 업로드** (build:local은 제외)
 
 ### 개별 빌드 명령어
 
@@ -197,6 +220,15 @@ npm run build:frontend
 
 # Electron만 빌드 (GitHub Release 업로드 포함)
 npm run build:electron
+
+# Electron 로컬 빌드 (업로드 없이)
+npm run build:electron:local
+
+# 서명 없이 빌드 (테스트용)
+npm run build:electron:unsigned
+
+# 캐시 초기화 후 빌드
+npm run build:electron:clean
 ```
 
 ### GitHub Release 배포
@@ -223,10 +255,20 @@ npm run build
 
 ### 빌드 결과물
 
-- `dist/ppop_promt Setup 1.0.0.exe` - Windows 설치 파일 (최종 배포용)
+- `dist/ppop_promt Setup 1.0.0.exe` - Windows 설치 파일 (코드 서명 포함, 최종 배포용)
 - `dist/latest.yml` - 자동 업데이트 메타데이터
 - `resources/ppop_promt_backend.exe` - 백엔드 독립 실행 파일
 - `frontend/dist/` - 프론트엔드 정적 파일
+- `certificate.pfx` - 코드 서명 인증서 (Git에 포함 안 됨)
+
+### 창 크기 설정
+
+앱은 자동으로 화면 해상도에 맞춰 창 크기를 조정합니다:
+- **가로:세로 비율**: 6:4 (1.5:1)
+- **초기 크기**: 화면 너비의 50% 기준으로 계산
+- **최소 크기**: 800x533 픽셀 (UI가 깨지지 않는 최소 크기)
+- **크기 조정**: 사용자가 자유롭게 조정 가능
+- **개발 모드**: 크기 제한 없음 (디버깅 편의)
 
 ## 자동 업데이트
 
@@ -277,11 +319,19 @@ SQLite 데이터베이스는 다음 위치에 저장됩니다:
 `.env` 파일을 생성하여 설정할 수 있습니다:
 
 ```env
+# Code Signing Certificate
+CSC_KEY_PASSWORD=ppop_promt_cert_password_2025
+
 # GitHub Personal Access Token (빌드 및 배포용)
 GH_TOKEN=your_github_token_here
+
+# Optional: Debug mode
+# DEBUG=true
 ```
 
-`.env.example` 파일을 참고하여 `.env` 파일을 생성하세요.
+`.env.template` 파일을 참고하여 `.env` 파일을 생성하세요.
+
+**중요**: `.env` 파일과 `certificate.pfx` 파일은 절대 Git에 커밋하지 마세요! (이미 `.gitignore`에 포함되어 있음)
 
 ## 문제 해결
 
@@ -312,6 +362,23 @@ GH_TOKEN=your_github_token_here
 3. 브라우저 콘솔에서 에러 메시지 확인
 4. 네트워크 탭에서 API 요청 상태 확인
 
+### 빌드 실패 문제
+
+**코드 서명 오류:**
+- `certificate.pfx` 파일이 프로젝트 루트에 있는지 확인
+- `.env` 파일에 `CSC_KEY_PASSWORD`가 설정되어 있는지 확인
+- 서명 없이 빌드하려면: `npm run build:electron:unsigned`
+
+**GitHub 업로드 실패:**
+- `.env` 파일에 `GH_TOKEN`이 설정되어 있는지 확인
+- GitHub Token에 `repo` 권한이 있는지 확인
+- 로컬 빌드만 하려면: `npm run build:local`
+
+**Windows SmartScreen 경고:**
+- 자체 서명 인증서 사용 시 정상적인 현상
+- 사용자는 "추가 정보" → "실행"을 클릭해야 함
+- 실제 배포 시 상업용 EV 인증서 구매 권장
+
 ## 기여하기
 
 1. Fork the repository
@@ -324,6 +391,10 @@ GH_TOKEN=your_github_token_here
 
 이 프로젝트의 라이선스 정보는 저장소를 확인하세요.
 
+## 추가 문서
+
+더 자세한 배포 가이드는 [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)를 참고하세요.
+
 ## 업데이트 내역
 
 ### v1.0.0 (현재)
@@ -333,3 +404,6 @@ GH_TOKEN=your_github_token_here
 - 자동변환 텍스트 서비스
 - GitHub Release 자동 업데이트 지원
 - PyInstaller를 통한 백엔드 독립 실행 파일 빌드
+- 코드 서명 지원 (Windows)
+- 반응형 창 크기 (6:4 비율, 해상도 자동 조정)
+- 최소 창 크기 제한 (UI 보호)

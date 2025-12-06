@@ -12,9 +12,11 @@
     "build:backend": "python backend/build_backend.py",
     "build:frontend": "cd frontend && npm run build",
     "build:electron": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=always",
+    "build:electron:local": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=never",
     "build:electron:clean": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=never --config.cache=null",
-    "build:electron:unsigned": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=always --config.win.sign=null",
-    "build": "npm run clean && npm run build:backend && npm run build:frontend && npm run build:electron"
+    "build:electron:unsigned": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=never --config.win.sign=null",
+    "build": "npm run clean && npm run build:backend && npm run build:frontend && npm run build:electron",
+    "build:local": "npm run clean && npm run build:backend && npm run build:frontend && npm run build:electron:local"
   },
   "dependencies": {
     "electron-updater": "^6.1.7"
