@@ -43,9 +43,10 @@ packages/
 *.app
 *.dmg
 *.exe.blockmap
-*.yml
-builder-debug.yml
-builder-effective-config.yaml
+/latest.yml
+/builder-debug.yml
+/builder-effective-config.yaml
+dist/*.yml
 
 # PyInstaller
 *.spec.bak
