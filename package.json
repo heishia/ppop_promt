@@ -71,8 +71,8 @@
         "nsis"
       ],
       "icon": "public/logo.ico",
-      "certificateFile": "certificate.pfx",
-      "publisherName": "ppop_promt"
+      "publisherName": "ppop_promt",
+      "sign": null
     },
     "nsis": {
       "oneClick": false,
