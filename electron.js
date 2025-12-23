@@ -25,6 +25,27 @@ autoUpdater.requestHeaders = {
     'Accept': 'application/vnd.github.v3+json, application/vnd.github.v3.raw+json, application/json, */*'
 };
 
+/**
+ * 버전 비교 함수 (semver 비교)
+ * @param {string} v1 - 첫 번째 버전 (예: "1.2.0")
+ * @param {string} v2 - 두 번째 버전 (예: "1.0.0")
+ * @returns {number} v1 > v2이면 1, v1 < v2이면 -1, 같으면 0
+ */
+function compareVersions(v1, v2) {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    
+    for (let i = 0; i < 3; i++) {
+        const part1 = parts1[i] || 0;
+        const part2 = parts2[i] || 0;
+        
+        if (part1 > part2) return 1;
+        if (part1 < part2) return -1;
+    }
+    
+    return 0;
+}
+
 // 단일 인스턴스 실행 강제 (중복 실행 방지)
 const gotTheLock = app.requestSingleInstanceLock();
 
@@ -50,12 +71,6 @@ if (!gotTheLock) {
             createWindow();
         }
     });
-}
-
-// 개발 모드에서는 업데이트 체크 비활성화
-if (app.isPackaged) {
-    // 프로덕션 환경에서만 업데이트 체크
-    autoUpdater.checkForUpdatesAndNotify();
 }
 
 // 백엔드 프로세스 강제 종료 함수
@@ -260,6 +275,16 @@ function createWindow() {
         if (mainWindow) {
             mainWindow.show();
             mainWindow.focus();
+            
+            // 프로덕션 환경에서만 업데이트 체크 (창 로드 후)
+            if (app.isPackaged) {
+                setTimeout(() => {
+                    console.log('업데이트 체크 시작 (창 로드 후 3초)');
+                    autoUpdater.checkForUpdates().catch((error) => {
+                        console.warn('업데이트 체크 실패:', error.message);
+                    });
+                }, 3000); // 3초 후 체크
+            }
         }
     });
     
@@ -367,9 +392,20 @@ function setupIpcHandlers() {
         }
         try {
             const result = await autoUpdater.checkForUpdates();
+            const currentVersion = app.getVersion();
+            const remoteVersion = result?.updateInfo?.version;
+            
+            // 버전 비교 (현재 버전보다 높은 버전만 업데이트로 판단)
+            const hasUpdate = result !== null && 
+                             remoteVersion && 
+                             compareVersions(remoteVersion, currentVersion) > 0;
+            
+            console.log(`IPC 업데이트 체크: 현재=${currentVersion}, 원격=${remoteVersion}, 업데이트 필요=${hasUpdate}`);
+            
             return { 
-                updateAvailable: result !== null,
-                version: result?.updateInfo?.version || null
+                updateAvailable: hasUpdate,
+                version: remoteVersion || null,
+                currentVersion: currentVersion
             };
         } catch (error) {
             return { error: error.message };
@@ -424,6 +460,19 @@ autoUpdater.on('checking-for-update', () => {
 });
 
 autoUpdater.on('update-available', (info) => {
+    const currentVersion = app.getVersion();
+    const remoteVersion = info.version;
+    
+    console.log(`업데이트 체크: 현재 버전=${currentVersion}, 원격 버전=${remoteVersion}`);
+    
+    // 버전 비교 (현재 버전보다 높은 버전만 알림)
+    const versionComparison = compareVersions(remoteVersion, currentVersion);
+    
+    if (versionComparison <= 0) {
+        console.log(`원격 버전(${remoteVersion})이 현재 버전(${currentVersion})보다 낮거나 같음. 업데이트 무시.`);
+        return;
+    }
+    
     console.log('새 업데이트가 있습니다:', info.version);
     if (mainWindow) {
         mainWindow.webContents.send('update-available', {
@@ -634,48 +683,62 @@ app.whenReady().then(() => {
         // 백엔드 시작 실패해도 창은 열기
     }
     
-    // 프론트엔드 개발 서버가 시작될 때까지 대기 후 창 생성
-    // 개발 서버가 준비될 때까지 최대 10초 대기
-    let retryCount = 0;
-    const maxRetries = 20; // 20번 시도 (총 10초)
+    // 개발 환경 확인
+    const isDev = !app.isPackaged;
     
-    const tryCreateWindow = () => {
-        // 프론트엔드 개발 서버 연결 확인
-        const http = require('http');
-        const checkServer = () => {
-            return new Promise((resolve) => {
-                const req = http.get('http://localhost:5173', (res) => {
-                    resolve(true);
+    if (isDev) {
+        // 개발 모드: 프론트엔드 개발 서버가 시작될 때까지 대기 후 창 생성
+        // 개발 서버가 준비될 때까지 최대 10초 대기
+        let retryCount = 0;
+        const maxRetries = 20; // 20번 시도 (총 10초)
+        
+        const tryCreateWindow = () => {
+            // 프론트엔드 개발 서버 연결 확인
+            const http = require('http');
+            const checkServer = () => {
+                return new Promise((resolve) => {
+                    const req = http.get('http://localhost:5173', (res) => {
+                        resolve(true);
+                    });
+                    req.on('error', () => {
+                        resolve(false);
+                    });
+                    req.setTimeout(500, () => {
+                        req.destroy();
+                        resolve(false);
+                    });
                 });
-                req.on('error', () => {
-                    resolve(false);
-                });
-                req.setTimeout(500, () => {
-                    req.destroy();
-                    resolve(false);
-                });
+            };
+            
+            checkServer().then((isReady) => {
+                if (isReady || retryCount >= maxRetries) {
+                    try {
+                        createWindow();
+                        console.log('메인 윈도우 생성 완료');
+                    } catch (error) {
+                        console.error('메인 윈도우 생성 실패:', error);
+                        dialog.showErrorBox('앱 시작 오류', `앱을 시작하는 중 오류가 발생했습니다:\n${error.message}`);
+                    }
+                } else {
+                    retryCount++;
+                    console.log(`프론트엔드 서버 대기 중... (${retryCount}/${maxRetries})`);
+                    setTimeout(tryCreateWindow, 500);
+                }
             });
         };
         
-        checkServer().then((isReady) => {
-            if (isReady || retryCount >= maxRetries) {
-                try {
-                    createWindow();
-                    console.log('메인 윈도우 생성 완료');
-                } catch (error) {
-                    console.error('메인 윈도우 생성 실패:', error);
-                    dialog.showErrorBox('앱 시작 오류', `앱을 시작하는 중 오류가 발생했습니다:\n${error.message}`);
-                }
-            } else {
-                retryCount++;
-                console.log(`프론트엔드 서버 대기 중... (${retryCount}/${maxRetries})`);
-                setTimeout(tryCreateWindow, 500);
-            }
-        });
-    };
-    
-    // 즉시 시도 시작
-    tryCreateWindow();
+        // 즉시 시도 시작
+        tryCreateWindow();
+    } else {
+        // 프로덕션 모드: 즉시 창 생성
+        try {
+            createWindow();
+            console.log('메인 윈도우 생성 완료 (프로덕션)');
+        } catch (error) {
+            console.error('메인 윈도우 생성 실패:', error);
+            dialog.showErrorBox('앱 시작 오류', `앱을 시작하는 중 오류가 발생했습니다:\n${error.message}`);
+        }
+    }
     
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
