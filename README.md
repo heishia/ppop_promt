@@ -1,5 +1,9 @@
 # ppop_promt - 프롬프트 관리 데스크탑 앱
 
+[![Release](https://github.com/heishia/ppop_promt/actions/workflows/release.yml/badge.svg)](https://github.com/heishia/ppop_promt/actions/workflows/release.yml)
+[![GitHub release](https://img.shields.io/github/v/release/heishia/ppop_promt)](https://github.com/heishia/ppop_promt/releases/latest)
+[![License](https://img.shields.io/github/license/heishia/ppop_promt)](LICENSE)
+
 ppop_promt는 프롬프트를 저장하고 자동변환 텍스트 기능을 제공하는 Electron 데스크탑 애플리케이션입니다.
 
 ## 주요 기능
