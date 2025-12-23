@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "node_modules\\.bin\\electron.cmd .",
     "clean": "node clean.js",
+    "setup:release": "node scripts/setup-release.js",
     "build:backend": "python backend/build_backend.py",
     "build:frontend": "cd frontend && npm run build",
     "build:electron": "node -r dotenv/config node_modules/electron-builder/cli.js --publish=always",

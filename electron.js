@@ -14,6 +14,7 @@ let backendProcess;
 let tray = null;
 let isQuitting = false;
 let backendPort = 8000; // 기본 포트, 동적으로 업데이트됨
+let ipcHandlersRegistered = false; // IPC 핸들러 중복 등록 방지 플래그
 
 // 자동 업데이트 설정
 autoUpdater.autoDownload = false; // 자동 다운로드 비활성화 (사용자 확인 후 다운로드)
@@ -29,12 +30,12 @@ const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
     // 이미 다른 인스턴스가 실행 중이면 종료
-    console.log('Another instance is already running. Quitting...');
+    console.log('이미 다른 인스턴스가 실행 중입니다. 종료합니다...');
     app.quit();
 } else {
     // 두 번째 인스턴스가 실행되려고 할 때 기존 창을 표시
     app.on('second-instance', (event, commandLine, workingDirectory) => {
-        console.log('Second instance detected. Focusing main window...');
+        console.log('두 번째 인스턴스 감지됨. 기존 창을 표시합니다...');
         if (mainWindow) {
             if (mainWindow.isMinimized()) {
                 mainWindow.restore();
@@ -43,6 +44,10 @@ if (!gotTheLock) {
                 mainWindow.show();
             }
             mainWindow.focus();
+        } else {
+            // 창이 없으면 새로 생성
+            console.log('기존 창이 없습니다. 새 창을 생성합니다...');
+            createWindow();
         }
     });
 }
@@ -53,6 +58,42 @@ if (app.isPackaged) {
     autoUpdater.checkForUpdatesAndNotify();
 }
 
+// 백엔드 프로세스 강제 종료 함수
+function killBackendProcess() {
+    if (!backendProcess || backendProcess.killed) {
+        return;
+    }
+    
+    console.log('백엔드 프로세스 강제 종료 시도...');
+    
+    try {
+        if (process.platform === 'win32') {
+            // Windows: taskkill로 프로세스 트리 전체 종료
+            const { execSync } = require('child_process');
+            try {
+                execSync(`taskkill /pid ${backendProcess.pid} /f /t`, { stdio: 'ignore' });
+                console.log('백엔드 프로세스 종료 완료 (taskkill)');
+            } catch (e) {
+                // 이미 종료된 경우 무시
+                console.log('백엔드 프로세스가 이미 종료되었습니다.');
+            }
+        } else {
+            // Unix: SIGTERM 후 SIGKILL
+            backendProcess.kill('SIGTERM');
+            setTimeout(() => {
+                if (backendProcess && !backendProcess.killed) {
+                    backendProcess.kill('SIGKILL');
+                }
+            }, 1000);
+            console.log('백엔드 프로세스 종료 완료 (SIGTERM)');
+        }
+    } catch (error) {
+        console.error('백엔드 프로세스 종료 중 오류:', error);
+    }
+    
+    backendProcess = null;
+}
+
 // 백엔드 서버 시작
 function startBackend() {
     const isDev = !app.isPackaged;
@@ -61,6 +102,12 @@ function startBackend() {
     if (backendProcess && !backendProcess.killed) {
         console.log('백엔드 프로세스가 이미 실행 중입니다.');
         return;
+    }
+    
+    // 기존 백엔드 프로세스가 있으면 먼저 종료
+    if (backendProcess) {
+        console.log('기존 백엔드 프로세스 정리 중...');
+        killBackendProcess();
     }
     
     if (isDev) {
@@ -136,12 +183,20 @@ function startBackend() {
     });
     
     backendProcess.on('exit', (code, signal) => {
-        console.log(`Backend process exited: code ${code}, signal ${signal}`);
+        console.log(`백엔드 프로세스 종료됨: code ${code}, signal ${signal}`);
         backendProcess = null;
         
-        // 자동 재시작 제거 - 사용자가 수동으로 재시작하거나 앱을 재시작해야 함
-        if (!isQuitting && code !== 0) {
-            console.error('Backend process exited unexpectedly. Please restart the app.');
+        // 앱이 종료 중이 아닌데 백엔드가 예기치 않게 종료된 경우
+        if (!isQuitting && code !== 0 && code !== null) {
+            console.error('백엔드 프로세스가 예기치 않게 종료되었습니다. 앱을 재시작해주세요.');
+            
+            // 사용자에게 알림
+            if (mainWindow) {
+                dialog.showErrorBox(
+                    '백엔드 오류',
+                    '백엔드 서버가 예기치 않게 종료되었습니다.\n앱을 재시작해주세요.'
+                );
+            }
         }
     });
 }
@@ -268,25 +323,43 @@ function createWindow() {
         });
     }
     
-    // 창 닫기 이벤트 처리 (완전 종료)
+    // 창 닫기 이벤트 처리
     mainWindow.on('close', (event) => {
-        // 창 닫기 버튼(X)을 누르면 백엔드까지 완전 종료
-        isQuitting = true;
-        if (backendProcess) {
-            backendProcess.kill();
+        if (process.platform === 'darwin') {
+            // macOS: 창을 닫아도 앱은 계속 실행 (기본 동작)
+            if (!isQuitting) {
+                event.preventDefault();
+                mainWindow.hide();
+            }
+        } else {
+            // Windows/Linux: X 버튼 클릭 시 완전 종료
+            console.log('창 닫기 버튼 클릭 - 앱 완전 종료');
+            isQuitting = true;
+            
+            // 백엔드 프로세스 종료
+            killBackendProcess();
+            
+            // 앱 종료
+            app.quit();
         }
     });
     
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
-
-    // IPC 핸들러 설정 (렌더러 프로세스와 통신)
-    setupIpcHandlers();
 }
 
 // IPC 핸들러 설정
 function setupIpcHandlers() {
+    // 이미 등록되었으면 중복 등록 방지
+    if (ipcHandlersRegistered) {
+        console.log('IPC 핸들러가 이미 등록되어 있습니다.');
+        return;
+    }
+    
+    console.log('IPC 핸들러 등록 중...');
+    ipcHandlersRegistered = true;
+    
     // 업데이트 체크 요청
     ipcMain.handle('check-for-updates', async () => {
         if (!app.isPackaged) {
@@ -488,10 +561,12 @@ function createTray() {
         {
             label: '종료',
             click: () => {
+                console.log('트레이 메뉴에서 종료 선택 - 앱 완전 종료');
                 isQuitting = true;
-                if (backendProcess) {
-                    backendProcess.kill();
-                }
+                
+                // 백엔드 프로세스 종료
+                killBackendProcess();
+                
                 app.quit();
             }
         }
@@ -537,6 +612,9 @@ if (process.platform === 'win32') {
 // 앱 준비 완료
 app.whenReady().then(() => {
     console.log('Electron 앱 시작 중...');
+    
+    // IPC 핸들러 등록 (앱 시작 시 한 번만)
+    setupIpcHandlers();
     
     try {
         // 시스템 트레이 생성
@@ -612,23 +690,23 @@ app.whenReady().then(() => {
     dialog.showErrorBox('앱 시작 오류', `앱을 시작할 수 없습니다:\n${error.message}`);
 });
 
-// 모든 윈도우가 닫히면 (macOS 제외)
+// 모든 윈도우가 닫히면
 app.on('window-all-closed', () => {
-    // macOS가 아닌 경우 창을 닫아도 앱이 계속 실행되도록 함 (트레이로 이동)
-    // macOS는 기본 동작 유지
-    if (process.platform === 'darwin') {
-        // macOS는 기본 동작
-    } else {
-        // Windows/Linux: 창을 닫아도 앱은 계속 실행 (트레이에 있음)
-        // app.quit()을 호출하지 않음
+    // Windows/Linux: 창 닫기(X 버튼)를 누르면 이미 app.quit()이 호출되어 여기로 옴
+    // macOS: 기본 동작 유지 (앱은 계속 실행)
+    if (process.platform !== 'darwin') {
+        // Windows/Linux: 창이 모두 닫히면 앱 종료
+        // (이미 close 이벤트에서 app.quit()을 호출했으므로 여기서는 아무것도 하지 않음)
+        console.log('모든 창이 닫혔습니다.');
     }
 });
 
 // 앱 종료 시 백엔드 프로세스도 종료
 app.on('before-quit', (event) => {
+    console.log('앱 종료 전 정리 작업 시작...');
     isQuitting = true;
-    if (backendProcess) {
-        backendProcess.kill();
-    }
+    
+    // 백엔드 프로세스 종료
+    killBackendProcess();
 });
 
